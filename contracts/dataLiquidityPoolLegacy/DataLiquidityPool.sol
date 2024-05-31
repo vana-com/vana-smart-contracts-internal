@@ -340,47 +340,6 @@ contract DataLiquidityPoolLegacy is
         );
     }
 
-    // /**
-    //  * @notice Approve validator
-    //  *
-    //  * @param validatorAddress               validator addresses
-    //  */
-    // function changeActiveValidatorsList(address[] addValidatorAddresses, address removeValidatorAddresses) external onlyOwner {
-    //     uint256 index;
-
-    //     RewardPeriod storage rewardPeriod = _rewardPeriods[rewardPeriodsCount];
-
-    //     ValidatorList memory currentActiveValidatorList = _activeValidatorLists[activeValidatorListsCount];
-    //     uint256 currentNumberOfValidators = currentActiveValidatorList.validators;
-
-    //     activeValidatorListsCount++;
-    //     ValidatorList storage newActiveValidatorList = _activeValidatorLists[activeValidatorListsCount];
-
-    //     uint256 newValidatorCount;
-    //     for (index = 0; index < currentNumberOfValidators; index++) {
-    //         if ()
-    //         newActiveValidatorList.validators[newValidatorCount] = currentActiveValidatorList.validators[index];
-    //     }
-
-    //     ValidatorInfo storage validator = _validatorInfo[validatorAddress];
-
-    //     if (validator.status != ValidatorStatus.Pending) {
-    //         revert ValidatorAlreadyApproved();
-    //     }
-
-    //     if (_activeValidators.length() >= maxNumberOfValidators) {
-    //         revert TooManyValidators();
-    //     }
-
-    //     validator.status = ValidatorStatus.Active;
-
-    //     _activeValidators.add(validatorAddress);
-
-    //     validator.id = _activeValidators.length();
-
-    //     emit ValidatorApproved(validatorAddress);
-    // }
-
     /**
      * @notice Approve validator
      *
@@ -518,38 +477,6 @@ contract DataLiquidityPoolLegacy is
         if (nextFileId > _fileUrls.length()) {
             nextFileId = 0;
         }
-
-        // ValidatorList memory currentActiveValidatorList = _activeValidatorLists[
-        //     _rewardPeriods[rewardPeriodsCount].validatorListId
-        // ];
-        // uint256 currentActiveValidatorListCount = currentActiveValidatorList
-        //     .count;
-
-        // if (
-        //     !(nextFileId > 0 &&
-        //         _files[nextFileId].addedTimestamp + validationPeriod <
-        //         block.timestamp)
-        // ) {
-        //     for (
-        //         uint256 index = 1;
-        //         index <= currentActiveValidatorListCount;
-        //         index++
-        //     ) {
-        //         uint256 otherNextFileId = getNextFileToVerifyByValidator(
-        //             currentActiveValidatorList.validators[index]
-        //         );
-
-        //         if (
-        //             otherNextFileId > 0 &&
-        //             _files[otherNextFileId].addedTimestamp + validationPeriod <
-        //             block.timestamp &&
-        //             _files[otherNextFileId].addedTimestamp <
-        //             _files[nextFileId].addedTimestamp
-        //         ) {
-        //             nextFileId = otherNextFileId;
-        //         }
-        //     }
-        // }
 
         return (
             nextFileId,
@@ -1024,100 +951,6 @@ contract DataLiquidityPoolLegacy is
                     .validatorRewards[validatorList.validators[i]]
                     .withdrawedAmount = validatorReward;
             }
-        }
-    }
-
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-
-    //methods used just for de development part
-    //todo: to be removed before production
-
-    /**
-     * @notice do not use in production
-     * @notice Override the stake amount of a validator
-     *
-     * @param validators                           validator addresses
-     * @param weights                              weights
-     */
-    function overrideWeights(
-        address sender,
-        address[] memory validators,
-        uint256[] memory weights
-    ) external onlyOwner {
-        if (_validatorInfo[sender].status != ValidatorStatus.Active) {
-            revert NotValidator();
-        }
-
-        uint256 length = validators.length;
-
-        if (length != weights.length) {
-            revert ArityMismatch();
-        }
-
-        ValidatorInfo storage validator = _validatorInfo[sender];
-
-        for (uint256 i = 0; i < weights.length; i++) {
-            validator.weights[validators[i]] = weights[i];
-        }
-
-        emit WeightUpdated(sender, validators, weights);
-    }
-    /**
-     * @notice do not use in production
-     * @notice Override the stake amount of a validator
-     *
-     * @param validatorAddress                   address of the validator
-     * @param amount                             amount staked in this call
-     */
-    function overrideStake(
-        address validatorAddress,
-        uint256 amount
-    ) external onlyOwner {
-        _validatorInfo[validatorAddress].stakeAmount = amount;
-    }
-
-    /**
-     * @notice do not use in production
-     * @notice Override endBclock of a current reward period
-     *
-     * @param endBlock                   address of the validator
-     */
-    function overrideRewardPeriodEndBlock(uint256 endBlock) external onlyOwner {
-        RewardPeriod storage lastPeriod = _rewardPeriods[rewardPeriodsCount];
-        lastPeriod.endBlock = endBlock;
-    }
-
-    event EthTransfered(
-        address receiver1,
-        address receiver2,
-        uint256 amount1,
-        uint256 amount2
-    );
-
-    function getRewardPeriodRewards(
-        uint256 period
-    ) external view returns (address[] memory validators, uint256[] memory shares, uint256[] memory withdrawals) {
-        ValidatorList storage validatorList = _activeValidatorLists[
-            _rewardPeriods[period].validatorListId
-        ];
-
-        uint256 validatorsCount = validatorList.count;
-
-        validators = new address[](validatorsCount);
-        withdrawals = new uint256[](validatorsCount);
-        shares = new uint256[](validatorsCount);
-
-        for (uint256 i = 0; i < validatorsCount; i++) {
-            validators[i] = validatorList.validators[i];
-            withdrawals[i] = _rewardPeriods[period]
-                .validatorRewards[validatorList.validators[i]]
-                .withdrawedAmount;
-            shares[i] = _rewardPeriods[period]
-                .validatorRewards[validatorList.validators[i]]
-                .share;
         }
     }
 }
