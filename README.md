@@ -16,22 +16,21 @@ npx hardhat test
 
 5. Create an `.env` file for the smart contract repo. You will need the owner address and private key. 
 
+```
 DEPLOYER_PRIVATE_KEY=8...7
 OWNER_ADDRESS=0x3....1
 SATORI_RPC_URL=http://....
 ```
 6. Deploy smart contract
 
-a. The new DLP Version
+a. Deploy the new DLP version
 ```bash
 npx hardhat deploy --network satori --tags DLPDeploy
 ```
 
-b. The legacy DLP Version
+b. Deploy the legacy DLP version
 ```bash
 npx hardhat deploy --network satori --tags DLPLegacyDeploy
 ```
 
-7. 
-
-8. Congratulations, you've deployed the DLP smart contract. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/ . Copy the deployed smart contract address. 
+7. Congratulations, you've deployed the DLP smart contract. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/ . Copy the deployed smart contract address. 
