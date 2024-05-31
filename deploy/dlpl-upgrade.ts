@@ -8,7 +8,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		await ethers.getContractFactory("DataLiquidityPool"),
 	);
 
-	console.log("DataLiquidityPool deployed at:", dlpDeploy.target);
+	console.log("DataLiquidityPool upgraded");
 };
 
 export default func;

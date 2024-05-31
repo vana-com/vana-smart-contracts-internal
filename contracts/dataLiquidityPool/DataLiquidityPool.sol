@@ -9,8 +9,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./interfaces/DataLiquidityPoolStorageV1.sol";
 
-import "hardhat/console.sol";
-
 contract DataLiquidityPool is
     UUPSUpgradeable,
     PausableUpgradeable,

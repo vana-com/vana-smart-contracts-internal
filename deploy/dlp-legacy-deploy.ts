@@ -14,11 +14,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const validationPeriod = 120;
 	const rewardPeriodSize = 14400;
 	const minStakeAmount  = parseEther('0');
-	let startBlock: number;
 	let rewardAmount = parseEther('0.000000001');
 
 	const dlpDeploy = await upgrades.deployProxy(
-		await ethers.getContractFactory("DataLiquidityPool"),
+		await ethers.getContractFactory("DataLiquidityPoolLegacy"),
 		[
 			process.env.OWNER_ADDRESS,
 			maxNumberOfValidators,
@@ -37,8 +36,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	  );
 
 
-	console.log("DataLiquidityPool deployed at:", dlpDeploy.target);
+	console.log("DataLiquidityPoolLegacy deployed at:", dlpDeploy.target);
 };
 
 export default func;
-func.tags = ["DLPDeploy"];
+func.tags = ["DLPLegacyDeploy"];
