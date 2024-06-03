@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -1219,70 +1218,5 @@ contract DataLiquidityPool is
                 validatorRewardDiff
             );
         }
-    }
-
-    /*****************************      internal functions       ****************************************/
-
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-    //****************************************************************************************************** */
-
-    //functions used just for de development part
-    //todo: to be removed before production
-
-    /**
-     * @notice do not use in production
-     * @notice Override the stake amount of a validator
-     *
-     * @param validators                           validator addresses
-     * @param weights                              weights
-     */
-    function overrideWeights(
-        address sender,
-        address[] memory validators,
-        uint256[] memory weights
-    ) external onlyOwner {
-        if (_validatorInfo[sender].status != ValidatorStatus.Active) {
-            revert NotValidator();
-        }
-
-        uint256 length = validators.length;
-
-        if (length != weights.length) {
-            revert ArityMismatch();
-        }
-
-        ValidatorInfo storage validator = _validatorInfo[sender];
-
-        for (uint256 i = 0; i < weights.length; i++) {
-            validator.weights[validators[i]] = weights[i];
-        }
-
-        emit WeightsUpdated(sender, validators, weights);
-    }
-    /**
-     * @notice do not use in production
-     * @notice Override the stake amount of a validator
-     *
-     * @param validatorAddress                   address of the validator
-     * @param amount                             amount staked in this call
-     */
-    function overrideStake(
-        address validatorAddress,
-        uint256 amount
-    ) external onlyOwner {
-        _validatorInfo[validatorAddress].stakeAmount = amount;
-    }
-
-    /**
-     * @notice do not use in production
-     * @notice Override endBclock of a current epoch
-     *
-     * @param endBlock                   address of the validator
-     */
-    function overrideEpochEndBlock(uint256 endBlock) external onlyOwner {
-        Epoch storage lastEpoch = _epochs[epochsCount];
-        lastEpoch.endBlock = endBlock;
     }
 }
