@@ -283,6 +283,64 @@ describe("DataLiquidityPoolStaking", () => {
       await deploy();
     });
 
+    it("should process epochs with no active validators without errors", async function () {
+      await advanceToEpochN(3);
+      await dlp.connect(owner).createEpochs();
+
+      for (let i = 1; i <= 2; i++) {
+        (await dlp.epochs(i)).validatorsListId.should.eq(0);
+      }
+    });
+
+    it("should process an empty epoch and an epoch with validators", async function () {
+      await advanceToEpochN(3);
+
+      await dlp.connect(v1OwnerAddress).registerValidator(v1Address, v1OwnerAddress, { value: parseEther('100') });
+      await dlp.connect(v2OwnerAddress).registerValidator(v2Address, v2OwnerAddress, { value: parseEther('100') });
+      await dlp.connect(owner).approveValidator(v1Address);
+      await dlp.connect(owner).approveValidator(v2Address);
+
+      await dlp.connect(v1Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+      await dlp.connect(v2Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+
+      await advanceToEpochN(4);
+
+      await dlp.connect(v1Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+
+      const epoch1 = await dlp.epochs(1);
+      epoch1.validatorsListId.should.eq(0);
+
+      const epoch2 = await dlp.epochs(2);
+      epoch2.validatorsListId.should.eq(0);
+
+      const epoch3 = await dlp.epochs(3);
+      epoch3.validatorsListId.should.not.eq(0);
+    });
+
+    it.only("should process multiple empty epochs and an epoch with validators", async function () {
+      await advanceToEpochN(3);
+
+      await dlp.connect(v1OwnerAddress).registerValidator(v1Address, v1OwnerAddress, { value: parseEther('100') });
+      await dlp.connect(v2OwnerAddress).registerValidator(v2Address, v2OwnerAddress, { value: parseEther('100') });
+      await dlp.connect(owner).approveValidator(v1Address);
+      await dlp.connect(owner).approveValidator(v2Address);
+
+      await dlp.connect(v1Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+      await dlp.connect(v2Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+
+      await advanceToEpochN(4);
+
+      await dlp.connect(v1Address).updateWeights([v1Address, v2Address], [parseEther('1'), parseEther('1')]);
+
+      for (let i = 1; i <= 2; i++) {
+        const epoch = await dlp.epochs(i);
+        epoch.validatorsListId.should.eq(0);
+      }
+
+      const epoch3 = await dlp.epochs(3);
+      epoch3.validatorsListId.should.not.eq(0);
+    });
+
     it("should createEpochs after the end of the previous one", async function () {
       await advanceToEpochN(2);
 
