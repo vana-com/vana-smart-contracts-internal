@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -1159,7 +1160,7 @@ contract DataLiquidityPool is
         }
 
         if (!hasAnyStake) {
-            return new uint256[](0);
+            return new uint256[](epochValidatorsCount);
         }
 
         uint256[][] memory W = new uint256[][](epochValidatorsCount);

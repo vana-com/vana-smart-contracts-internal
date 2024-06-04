@@ -29,6 +29,23 @@ module.exports = {
     },
   },
   etherscan: {
+    apiKey: {
+      // Is not required by blockscout. Can be any non-empty string
+      satori: "abc"
+    },
+    customChains: [
+      {
+        network: "satori",
+        chainId: 14801,
+        urls: {
+          apiURL: process.env.SATORI_API_URL || "",
+          browserURL: process.env.SATORI_BROWSER_URL || "",
+        }
+      }
+    ]
+  },
+  sourcify: {
+    enabled: false
   },
   paths: {
     sources: "./contracts",
@@ -43,9 +60,6 @@ module.exports = {
     enabled: true,
     excludeContracts: ["mocks", "tests"],
     include: ["../node_module/@openzeppelin/contracts-upgradeable"]
-  },
-  sourcify: {
-    enabled: true
   }
 }
 

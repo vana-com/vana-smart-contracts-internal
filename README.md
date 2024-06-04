@@ -36,12 +36,6 @@ npx hardhat deploy --network satori --tags DLPLegacyDeploy
 7. Congratulations, you've deployed the DLP smart contract. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/address/<contract_address>. 
 
 8. verify the contract:
-- go to the contract address: https://satori.vanascan.io/address/<contract_address>?tab=read_proxy
-- find the implementation address and go to https://satori.vanascan.io/address/<implementation_contract_Address>?tab=contract
-- click "verify & publish"
-- contract licence:  "MIT"
-- verification method: "Solidity (Flatten)"
-- compiler version: "0.8.24"
-- evm: "instanbul"
-- contract code - copy the code from here: https://github.com/vana-com/vana-dlp-smart-contracts/blob/main/flattened/DataLiquidityPoolFlattened.sol
-- press "verify & publish"
+```bash
+npx hardhat verify --network satori <contract_address>
+```
