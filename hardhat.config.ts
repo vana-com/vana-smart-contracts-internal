@@ -36,7 +36,8 @@ module.exports = {
   etherscan: {
     apiKey: {
       // Is not required by blockscout. Can be any non-empty string
-      satori: "abc"
+      satori: "abc",
+      moksha: "abc"
     },
     customChains: [
       {
