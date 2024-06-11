@@ -55,11 +55,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	await new Promise((resolve) => setTimeout(resolve, 10000));
 
-	await dlpt.mint(deployer.address, parseEther('3000000'));
+	await dlpt.connect(deployer).mint(deployer.address, parseEther('10000000'));
 
-	await dlpt.approve(dlp, parseEther('3000000'));
-	await dlp.addRewardForValidators(parseEther('2000000'));
-	await dlp.addRewardsForContributors(parseEther('1000000'));
+	await dlpt.connect(deployer).approve(dlp, parseEther('3000000'));
+	await dlp.connect(deployer).addRewardForValidators(parseEther('2000000'));
+	await dlp.connect(deployer).addRewardsForContributors(parseEther('1000000'));
+	await dlpt.connect(deployer).transfer(ownerAddress, parseEther('7000000'));
 
 	await dlpt.transferOwnership(ownerAddress);
 	await dlp.transferOwnership(ownerAddress);
