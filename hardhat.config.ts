@@ -51,7 +51,7 @@ module.exports = {
       },
       {
         network: "moksha",
-        chainId: 19311041,
+        chainId: 14800,
         urls: {
           apiURL: process.env.MOKSHA_API_URL || "",
           browserURL: process.env.MOKSHA_BROWSER_URL || "",

@@ -269,7 +269,7 @@ contract DataLiquidityPool is
      * @param newEpochSize                       epoch size size
      * @param newEpochRewardAmount               reward amount
      * @param newFileRewardDelay                 file reward delay
-     
+
      */
     function initialize(
         address ownerAddress,
@@ -338,6 +338,7 @@ contract DataLiquidityPool is
      * @notice Get the number of files
      */
     function filesCount() external view returns (uint256) {
+        // TODO: fix spelling
         return _fileUrlHases.length();
     }
 
@@ -1074,6 +1075,7 @@ contract DataLiquidityPool is
         file.verificationsCount++;
 
         verification.validatorAddress = msg.sender;
+        // TODO: fix spelling
         verification.timespatmp = block.timestamp;
         verification.score = score;
         verification.metadata = metadata;
