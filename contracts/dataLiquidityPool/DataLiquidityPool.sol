@@ -288,6 +288,7 @@ contract DataLiquidityPool is
      * @notice Get the number of files
      */
     function filesCount() external view returns (uint256) {
+        // TODO: fix spelling
         return _fileUrlHases.length();
     }
 
@@ -334,6 +335,7 @@ contract DataLiquidityPool is
         override
         returns (
             address validatorAddress,
+            // TODO: fix spelling
             uint256 timespatmp,
             uint256 score,
             string memory metadata
