@@ -1,7 +1,7 @@
 ## Deploy your own DLP & Token smart contracts on Satori
 
 1. Install hardhat: https://hardhat.org/hardhat-runner/docs/getting-started#installation
-2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/dlp-smart-contracts/
+2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/vana-dlp-smart-contracts/
 3. Install dependencies
 
 ```bash
