@@ -136,6 +136,19 @@ contract DataLiquidityPoolsRoot is
      */
     event MinStakeAmountUpdated(uint256 newMinStakeAmount);
 
+    /**
+     * @notice Triggered when a dlp has claimed un unsed reward
+     *
+     * @param dlp                           address of the dlp
+     * @param epochId                             epcoch id
+     * @param claimAmount                         amount claimed
+     */
+    event EpochRewardClaimed(
+        address dlp,
+        uint256 epochId,
+        uint256 claimAmount
+    );
+
     error InvalidStakeAmount();
     error InvalidDlpStatus();
     error TooManyDlps();
@@ -144,6 +157,7 @@ contract DataLiquidityPoolsRoot is
     error ArityMismatch();
     error NotAllowed();
     error InvalidScores();
+    error NothingToClaim();
 
     /**
      * @dev Modifier to make a function callable only when the caller is the owner of the dlp
@@ -311,7 +325,7 @@ contract DataLiquidityPoolsRoot is
     }
 
     /**
-     * @notice Get scores of all active validators
+     * @notice Get scores of all active dlps
      */
     function dlpScores()
         external
@@ -382,6 +396,8 @@ contract DataLiquidityPoolsRoot is
     ) external override onlyOwner {
         createEpochs();
         epochRewardAmount = newEpochRewardAmount;
+
+        _epochs[epochsCount].reward = newEpochRewardAmount;
 
         emit EpochRewardAmountUpdated(newEpochRewardAmount);
     }
@@ -588,7 +604,7 @@ contract DataLiquidityPoolsRoot is
 
         uint256 length = dlps.length;
 
-        if (length != scores.length || length != activeDlpsListsCount) {
+        if (length != scores.length || length != _activeDlpsLists[activeDlpsListsCount].length()) {
             revert ArityMismatch();
         }
 
@@ -616,6 +632,32 @@ contract DataLiquidityPoolsRoot is
      */
     function addRewardForDlps() external payable override nonReentrant {
         totalDlpsRewardAmount += msg.value;
+    }
+
+
+    function claimUnsentReward(address dlpAddress, uint256 epochNumber) external onlyDlpOwner(dlpAddress) {
+        Epoch storage epoch = _epochs[epochNumber];
+        DlpReward storage dlpReward = epoch.dlpRewards[dlpAddress];
+
+        DlpInfo storage dlp = _dlpsInfo[dlpAddress];
+
+        uint256 dlpRewardAmount = (dlpReward.score * epoch.reward) / 1e18;
+
+        if (dlpRewardAmount <= dlpReward.withdrawnAmount) {
+            revert NothingToClaim();
+        }
+
+        uint256 unclaimedReward = dlpRewardAmount - dlpReward.withdrawnAmount;
+
+        if (totalDlpsRewardAmount > unclaimedReward) {
+            epoch
+                .dlpRewards[dlpAddress]
+                .withdrawnAmount = dlpRewardAmount;
+            totalDlpsRewardAmount -= unclaimedReward;
+            dlp.ownerAddress.transfer(unclaimedReward);
+
+            emit EpochRewardClaimed(dlpAddress, epochNumber, unclaimedReward);
+        }
     }
 
     function _deregisterDlp(address dlpAddress) internal {
@@ -677,14 +719,14 @@ contract DataLiquidityPoolsRoot is
             DlpReward storage dlpReward = epoch.dlpRewards[dlpAddress];
 
             dlpReward.score = dlp.score;
-            dlpReward.withdrawnAmount = dlpRewardAmount;
 
-            //send the reward to the dlp
+            //send the reward to the dlps
             if (
                 dlpRewardAmount > 0 && totalDlpsRewardAmount > dlpRewardAmount
             ) {
+                dlpReward.withdrawnAmount = dlpRewardAmount;
                 totalDlpsRewardAmount -= dlpRewardAmount;
-                _dlpsInfo[dlpAddress].ownerAddress.transfer(dlpRewardAmount);
+                dlp.ownerAddress.transfer(dlpRewardAmount);
             }
         }
     }

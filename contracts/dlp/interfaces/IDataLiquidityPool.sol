@@ -44,7 +44,7 @@ interface IDataLiquidityPool is IAccessControl {
     }
 
     struct ValidatorReward {
-        uint256 scores;
+        uint256 score;
         uint256 withdrawnAmount;
     }
 
@@ -227,4 +227,5 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 contributorsRewardAmount
     ) external;
     function claimContributionReward(uint256 fileId) external;
+    function claimUnsentReward(address validatorAddress, uint256 epochNumber) external;
 }

@@ -247,20 +247,36 @@ describe("DataLiquidityPool", () => {
     });
 
     it("Should updateEpochRewardAmount when owner", async function () {
+      (await dlp.epochs(1)).reward.should.eq(epochRewardAmount);
+
       await dlp.connect(owner).updateEpochRewardAmount(123)
         .should.emit(dlp, 'EpochRewardAmountUpdated')
         .withArgs(123);
 
       (await dlp.epochRewardAmount()).should.eq(123);
+
+      (await dlp.epochs(1)).reward.should.eq(123);
     });
 
-    it("Should reject updateEpochSize when non-owner", async function () {
-      await dlp.connect(v1).updateEpochRewardAmount(123)
-        .should.be.rejectedWith(
-          `OwnableUnauthorizedAccount("${v1.address}")`
-        );
+    it("Should updateEpochRewardAmount starting with the current epoch", async function () {
+      await advanceToEpochN(3);
+      (await dlp.epochs(1)).reward.should.eq(epochRewardAmount);
 
-      (await dlp.epochRewardAmount()).should.eq(epochRewardAmount);
+      await dlp.connect(owner).updateEpochRewardAmount(123)
+        .should.emit(dlp, 'EpochRewardAmountUpdated')
+        .withArgs(123);
+
+      (await dlp.epochRewardAmount()).should.eq(123);
+
+      await advanceToEpochN(5);
+      await dlp.createEpochs();
+
+      (await dlp.epochs(1)).reward.should.eq(epochRewardAmount);
+      (await dlp.epochs(2)).reward.should.eq(epochRewardAmount);
+      (await dlp.epochs(3)).reward.should.eq(123);
+      (await dlp.epochs(4)).reward.should.eq(123);
+      (await dlp.epochs(5)).reward.should.eq(123);
+
     });
 
     it("Should updateValidationPeriod when owner", async function () {

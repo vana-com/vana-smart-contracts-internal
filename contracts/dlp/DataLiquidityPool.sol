@@ -224,6 +224,19 @@ contract DataLiquidityPool is
         uint256 amount
     );
 
+    /**
+     * @notice Triggered when a validator has claimed un unsed reward
+     *
+     * @param validator                           address of the validator
+     * @param epochId                             epcoch id
+     * @param claimAmount                         amount claimed
+     */
+    event EpochRewardClaimed(
+        address validator,
+        uint256 epochId,
+        uint256 claimAmount
+    );
+
     error InvalidStakeAmount();
     error InvalidValidatorStatus();
     error TooManyValidators();
@@ -236,6 +249,7 @@ contract DataLiquidityPool is
     error ArityMismatch();
     error NotFileOwner();
     error NotAllowed();
+    error NothingToClaim();
 
     /**
      * @dev Modifier to make a function callable only when the caller is an active validator
@@ -594,7 +608,7 @@ contract DataLiquidityPool is
 
         for (uint256 i = 0; i < epochValidatorsCount; i++) {
             validators[i] = epochValidators.at(i);
-            scores[i] = epoch.validatorRewards[validators[i]].scores;
+            scores[i] = epoch.validatorRewards[validators[i]].score;
             withdrawnAmounts[i] = epoch
                 .validatorRewards[validators[i]]
                 .withdrawnAmount;
@@ -678,6 +692,8 @@ contract DataLiquidityPool is
     ) external override onlyOwner {
         createEpochs();
         epochRewardAmount = newEpochRewardAmount;
+
+        _epochs[epochsCount].reward = newEpochRewardAmount;
 
         emit EpochRewardAmountUpdated(newEpochRewardAmount);
     }
@@ -1169,6 +1185,31 @@ contract DataLiquidityPool is
         emit ContributionRewardClaimed(msg.sender, fileId, file.reward);
     }
 
+    function claimUnsentReward(address validatorAddress, uint256 epochNumber) external override onlyValidatorOwner(validatorAddress) {
+        Epoch storage epoch = _epochs[epochNumber];
+        ValidatorReward storage validatorReward = epoch.validatorRewards[validatorAddress];
+
+        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
+
+        uint256 validatorRewardAmount = (validatorReward.score * epoch.reward) / 1e18;
+
+        if (validatorRewardAmount <= validatorReward.withdrawnAmount) {
+            revert NothingToClaim();
+        }
+
+        uint256 unclaimedReward = validatorRewardAmount - validatorReward.withdrawnAmount;
+
+        if (totalValidatorsRewardAmount > unclaimedReward) {
+            epoch
+                .validatorRewards[validatorAddress]
+                .withdrawnAmount = validatorRewardAmount;
+            totalValidatorsRewardAmount -= unclaimedReward;
+            token.safeTransfer(validator.ownerAddress, unclaimedReward);
+
+            emit EpochRewardClaimed(validatorAddress, epochNumber, unclaimedReward);
+        }
+    }
+
     /**
      * @notice Set the emission scores for the validators
      * Approximate sigmoid function using rational approximation and WAD
@@ -1440,24 +1481,20 @@ contract DataLiquidityPool is
             address validatorAddress = epochValidators.at(i);
             uint256 validatorReward = (scores[i] * epoch.reward) / 1e18;
 
-            uint256 validatorRewardDiff = validatorReward -
-                epoch.validatorRewards[validatorAddress].withdrawnAmount;
+            ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
-            epoch.validatorRewards[validatorAddress].scores = scores[i];
-            epoch
-                .validatorRewards[validatorAddress]
-                .withdrawnAmount = validatorReward;
+            epoch.validatorRewards[validatorAddress].score = scores[i];
 
             //send the reward to the validator
             if (
-                validatorRewardDiff > 0 &&
-                totalValidatorsRewardAmount > validatorRewardDiff
+                validatorReward > 0 &&
+                totalValidatorsRewardAmount > validatorReward
             ) {
-                totalValidatorsRewardAmount -= validatorRewardDiff;
-                token.safeTransfer(
-                    _validatorsInfo[validatorAddress].ownerAddress,
-                    validatorRewardDiff
-                );
+                epoch
+                    .validatorRewards[validatorAddress]
+                    .withdrawnAmount = validatorReward;
+                totalValidatorsRewardAmount -= validatorReward;
+                token.safeTransfer(validator.ownerAddress, validatorReward);
             }
         }
     }

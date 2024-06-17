@@ -104,4 +104,5 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         uint256[] memory scores
     ) external;
     function addRewardForDlps() external payable;
+    function claimUnsentReward(address dlpAddress, uint256 epochNumber) external;
 }
