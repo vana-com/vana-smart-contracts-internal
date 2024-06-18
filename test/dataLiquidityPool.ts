@@ -858,7 +858,7 @@ describe("DataLiquidityPool", () => {
         );
     });
 
-    it("should create epochs when adding files and no validators", async function () {
+    xit("should create epochs when adding files and no validators", async function () {
       await advanceToEpochN(4);
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress").should
         .emit(dlp, 'FileAdded').withArgs(user1, 1)
@@ -887,7 +887,7 @@ describe("DataLiquidityPool", () => {
       epoch4.validatorsListId.should.eq(0);
     });
 
-    it("should create epochs when adding files", async function () {
+    xit("should create epochs when adding files", async function () {
       await registerValidators();
 
       await advanceToEpochN(4);

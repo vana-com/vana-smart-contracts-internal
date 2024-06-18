@@ -972,7 +972,6 @@ contract DataLiquidityPool is
         string memory url,
         string memory encryptedKey
     ) external override whenNotPaused {
-        createEpochs();
         bytes32 urlHash = keccak256(abi.encodePacked(url));
         if (_fileUrlHashes.contains(urlHash)) {
             revert FileAlreadyAdded();
