@@ -13,7 +13,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const dlptDeploy = await ethers.deployContract("DLPT", [deployer.address]);
 	const dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
 
-
 	console.log("DataLiquidityPoolToken deployed at:", dlptDeploy.target);
 
 	const maxNumberOfValidators = 3;
@@ -30,25 +29,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	const dlpDeploy = await upgrades.deployProxy(
 		await ethers.getContractFactory("DataLiquidityPool"),
-		[
+		[{
 			ownerAddress,
-			dlptDeploy.target,
-			maxNumberOfValidators,
-			validatorScoreMinTrust,
-			validatorScoreKappa,
-			validatorScoreRho,
-			validationPeriod,
-			minStakeAmount,
+			tokenAddress: dlptDeploy.target,
+			newMaxNumberOfValidators: maxNumberOfValidators,
+			newValidatorScoreMinTrust: validatorScoreMinTrust,
+			newValidatorScoreKappa: validatorScoreKappa,
+			newValidatorScoreRho: validatorScoreRho,
+			newValidationPeriod: validationPeriod,
+			newMinStakeAmount: minStakeAmount,
 			startBlock,
-			rewardPeriodSize,
-			rewardAmount,
-			fileRewardFactor,
-			fileRewardDelay
-		],
+			newEpochSize: rewardPeriodSize,
+			newEpochRewardAmount: rewardAmount,
+			newFileRewardFactor: fileRewardFactor,
+			newFileRewardDelay: fileRewardDelay
+		}],
 		{
-		  kind: "uups"
+			kind: "uups"
 		}
-	  );
+	);
 	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);	
 
 	console.log("DataLiquidityPool deployed at:", dlp.target);

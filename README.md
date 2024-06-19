@@ -1,7 +1,7 @@
-## Deploy your own DLP & Token smart contracts on Satori
+## Deploy your own DLP, DLP Root, and Token smart contracts on Satori
 
 1. Install hardhat: https://hardhat.org/hardhat-runner/docs/getting-started#installation
-2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/dlp-smart-contracts/
+2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/dlp-smart-contracts
 3. Install dependencies
 
 ```bash
@@ -13,30 +13,53 @@ yarn install
 npx hardhat test
 ```
 
-5. Create an `.env` file for the smart contract repo. You will need the owner address and private key. 
+5. Create an `.env` file for the smart contract repo. You will need the owner address and private key.
 
 ```
 DEPLOYER_PRIVATE_KEY=8...7
 OWNER_ADDRESS=0x3....1
-SATORI_RPC_URL=http://....
+SATORI_RPC_URL=http://rpc.satori.vana.org
 ```
-6. Deploy DataLiquidityPool and Token smart contracts
+6. Deploy the DataLiquidityPoolsRoot smart contract
+
+```bash
+npx hardhat deploy --network satori --tags DLPRootDeploy
+```
+
+This will deploy the `DataLiquidityPoolsRoot` smart contract using the recommended params for testing. If you need a different setup, you can change them in the deploy/dlpRoot.ts script.
+
+7. Verify the `DataLiquidityPoolsRoot` contract:
+
+```bash
+npx hardhat verify --network satori <data_liquidity_pools_root_address>
+```
+
+8. Deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts
 
 ```bash
 npx hardhat deploy --network satori --tags DLPDeploy
 ```
 
-This will deploy 2 smart contracts (`DataLiquidityPool`, `DataLiquidityPoolToken`) using the recommended params for testing. If you need other setup, you can change them in the `deploy/dlp-deploy` script
+This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts using the recommended params for testing. If you need a different setup, you can change them in the `deploy/dlp-deploy.ts` script.
 
-7. verify the contract:
+9. Verify the `DataLiquidityPool` and `DataLiquidityPoolToken` contracts:
+
 ```bash
 npx hardhat verify --network satori <data_liquidity_pool_address>
 npx hardhat verify --network satori <data_liquidity_pool_token_address> <owner_address>
 ```
 
-8. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.org/address/<contract_address>. 
+10. Congratulations, you've deployed the DLP Root, DLP, and token smart contracts. You can confirm they are up by searching the addresses on the block explorer: https://satori.vanascan.org/address/<contract_address>.
 
+11. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlp-upgrade.ts` script:
 
+```bash
+npx hardhat deploy --network satori --tags DLPUpgrade
+```
+
+This will upgrade the `DataLiquidityPool` contract to the latest version while preserving its state and address.
+
+By following these steps, you can deploy the complete set of smart contracts (`DataLiquidityPoolsRoot`, `DataLiquidityPool`, and `DataLiquidityPoolToken`) to the Satori network and verify them on the block explorer. The `DataLiquidityPoolsRoot` contract manages the creation and reward distribution for multiple DLPs, while each `DataLiquidityPool` contract handles validator registration, file uploads, and reward distribution within its specific pool.
 
 
 Based on the provided Solidity contract, here is a README file in Markdown format for the `DLPT` contract:
