@@ -10,6 +10,9 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  * contract which implements DataLiquidityPoolStorageV1
  */
 abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+
     string public override name;
     IERC20 public override token;
     string public override masterKey;
@@ -33,7 +36,33 @@ abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
 
     uint256 public override activeValidatorsListsCount;
     mapping(uint256 => EnumerableSet.AddressSet) internal _activeValidatorsLists;
-    EnumerableSet.AddressSet internal _assignedValidators;
+
+    struct FileScore {
+        bool valid;
+        uint256 score;
+        uint256 reportedAtBlock;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
+    }
+
+    struct File {
+        address ownerAddress;
+        string url;
+        string encryptedKey;
+        uint256 addedTimestamp;
+        uint256 verificationsLength;
+        uint256 addedAtBlock;
+        bool valid;
+        uint256 score;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
+        mapping(address => FileScore) scores;
+        uint256 validatorScoreCount;
+    }
 
     mapping(uint256 => File) internal _files;
     EnumerableSet.Bytes32Set internal _fileUrlHashes;

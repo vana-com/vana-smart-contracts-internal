@@ -25,22 +25,32 @@ interface IDataLiquidityPool is IAccessControl {
         mapping(address => uint256) weights;
     }
 
-    struct FileVerificationInfo {
-        address validatorAddress;
-        uint256 timestamp;
+    struct FileScore {
+        bool valid;
         uint256 score;
-        string metadata;
+        uint256 reportedAtBlock;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
     }
 
     struct File {
-        address contributorAddress;
-        uint256 addedTimestamp;
-        uint256 verificationsCount;
+        address ownerAddress;
         string url;
         string encryptedKey;
+        uint256 addedTimestamp;
+        uint256 verificationsLength;
+        uint256 addedAtBlock;
+        bool valid;
+        uint256 score;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
+        mapping(address => FileScore) scores;
         uint256 reward;
         uint256 rewardWithdrawn;
-        mapping(uint256 => FileVerificationInfo) verifications;
     }
 
     struct ValidatorReward {
@@ -72,29 +82,22 @@ interface IDataLiquidityPool is IAccessControl {
     function validatorScoreKappa() external view returns (uint256);
     function validatorScoreRho() external view returns (uint256);
     function activeValidatorsListsCount() external view returns (uint256);
-        function activeValidatorsLists(
-        uint256 id
-    ) external view returns (address[] memory);
+    function activeValidatorsLists(uint256 id) external view returns (address[] memory);
     function epochsCount() external view returns (uint256);
+
     struct EpochResponse {
         uint256 startBlock;
         uint256 endBlock;
         uint256 reward;
         uint256 validatorsListId;
     }
-    function epochs(
-        uint256 epochId
-    ) external view returns (EpochResponse memory);
-    function epochRewards(
-        uint256 epochId
-    )
-        external
-        view
-        returns (
-            address[] memory validators,
-            uint256[] memory scores,
-            uint256[] memory withdrawnAmounts
-        );
+
+    function epochs(uint256 epochId) external view returns (EpochResponse memory);
+    function epochRewards(uint256 epochId) external view returns (
+        address[] memory validators,
+        uint256[] memory scores,
+        uint256[] memory withdrawnAmounts
+    );
     function minStakeAmount() external view returns (uint256);
     function totalStaked() external view returns (uint256);
     function totalValidatorsRewardAmount() external view returns (uint256);
@@ -102,6 +105,7 @@ interface IDataLiquidityPool is IAccessControl {
     function epochRewardAmount() external view returns (uint256);
     function fileRewardFactor() external view returns (uint256);
     function fileRewardDelay() external view returns (uint256);
+
     struct NextFileToVerify {
         uint256 fileId;
         string url;
@@ -109,22 +113,31 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 addedTime;
         address assignedValidator;
     }
-    function getNextFileToVerify(
-        address validatorAddress
-    ) external view returns (NextFileToVerify memory);
+
+    function getNextFileToVerify(address validatorAddress) external view returns (NextFileToVerify memory);
+
     struct FileResponse {
         uint256 fileId;
-        address contributorAddress;
+        address ownerAddress;
         string url;
         string encryptedKey;
         uint256 addedTimestamp;
+        uint256 addedAtBlock;
+        bool valid;
+        uint256 score;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
         uint256 reward;
         uint256 rewardWithdrawn;
-        uint256 verificationsCount;
+        uint256 verificationsLength;
     }
+
     function filesCount() external view returns (uint256);
     function files(uint256 fileId) external view returns (FileResponse memory);
     function validatorsCount() external view returns (uint256);
+
     struct ValidatorInfoResponse {
         address validatorAddress;
         address ownerAddress;
@@ -136,55 +149,30 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 filesToVerifyIndex;
         uint256 filesToVerifyCount;
     }
-    function validators(
-        uint256 index
-    ) external view returns (ValidatorInfoResponse memory);
-    function validatorFilesToVerify(
-        address validatorAddress,
-        uint256 index
-    ) external view returns (FileResponse memory);
-    function validatorsInfo(
-        address validatorAddress
-    ) external view returns (ValidatorInfoResponse memory);
-    function validatorWeights(
-        address validatorAddress
-    )
-        external
-        view
-        returns (address[] memory validators, uint256[] memory weights);
-    function fileVerifications(
-        uint256 fileId,
-        uint256 verificationId
-    ) external view returns (FileVerificationInfo memory);
+
+    function validators(uint256 index) external view returns (ValidatorInfoResponse memory);
+    function validatorFilesToVerify(address validatorAddress, uint256 index) external view returns (FileResponse memory);
+    function validatorsInfo(address validatorAddress) external view returns (ValidatorInfoResponse memory);
+    function validatorWeights(address validatorAddress) external view returns (address[] memory validators, uint256[] memory weights);
+    function fileScores(uint256 fileId, address validatorAddress) external view returns (FileScore memory);
     function contributorsCount() external view returns (uint256);
+
     struct ContributorInfoResponse {
         address contributorAddress;
         uint256 fileIdsCount;
     }
-    function contributors(
-        uint256 index
-    ) external view returns (ContributorInfoResponse memory);
-    function contributorInfo(
-        address contributorAddress
-    ) external view returns (ContributorInfoResponse memory);
-    function contributorFiles(
-        address contributorAddress,
-        uint256 index
-    ) external view returns (FileResponse memory);
-        function getEmissionScores(
-        uint256 epochNumber
-    ) external view returns (uint256[] memory);
+
+    function contributors(uint256 index) external view returns (ContributorInfoResponse memory);
+    function contributorInfo(address contributorAddress) external view returns (ContributorInfoResponse memory);
+    function contributorFiles(address contributorAddress, uint256 index) external view returns (FileResponse memory);
+    function getEmissionScores(uint256 epochNumber) external view returns (uint256[] memory);
     function pause() external;
     function unpause() external;
-    function updateMaxNumberOfValidators(
-        uint256 newMaxNumberOfValidators
-    ) external;
+    function updateMaxNumberOfValidators(uint256 newMaxNumberOfValidators) external;
     function updateEpochSize(uint256 newEpochSize) external;
     function updateEpochRewardAmount(uint256 newEpochRewardAmount) external;
     function updateValidationPeriod(uint256 newValidationPeriod) external;
-    function updateValidatorScoreMinTrust(
-        uint256 newValidatorScoreMinTrust
-    ) external;
+    function updateValidatorScoreMinTrust(uint256 newValidatorScoreMinTrust) external;
     function updateValidatorScoreKappa(uint256 newValidatorScoreKappa) external;
     function updateValidatorScoreRho(uint256 newValidatorScoreRho) external;
     function updateMinStakeAmount(uint256 newMinStakeAmount) external;
@@ -192,41 +180,16 @@ interface IDataLiquidityPool is IAccessControl {
     function updateFileRewardDelay(uint256 newFileRewardDelay) external;
     function createEpochs() external;
     function createEpochsUntilBlockNumber(uint256 blockNumber) external;
-    function registerValidator(
-        address validatorAddress,
-        address ownerAddress,
-        uint256 stakeAmount
-    ) external;
+    function registerValidator(address validatorAddress, address ownerAddress, uint256 stakeAmount) external;
     function approveValidator(address validatorAddress) external;
-        function deregisterValidator(
-        address validatorAddress
-    ) external;
-        function deregisterValidatorByOwner(
-        address validatorAddress,
-        uint256 unstakeAmount
-    ) external;
-        function setMasterKey(
-        string memory newMasterKey
-    ) external;
-    function addFile(
-        string memory url,
-        string memory encryptedKey
-    ) external;
-        function verifyFile(
-        uint256 fileId,
-        uint256 score,
-        string memory metadata
-    ) external;
-    function updateWeights(
-        address[] memory validators,
-        uint256[] memory weights
-    ) external;
-    function addRewardForValidators(
-        uint256 validatorsRewardAmount
-    ) external;
-        function addRewardsForContributors(
-        uint256 contributorsRewardAmount
-    ) external;
+    function deregisterValidator(address validatorAddress) external;
+    function deregisterValidatorByOwner(address validatorAddress, uint256 unstakeAmount) external;
+    function setMasterKey(string memory newMasterKey) external;
+    function addFile(string memory url, string memory encryptedKey) external;
+    function verifyFile(uint256 fileId, bool valid, uint256 score, uint256 authenticity, uint256 ownership, uint256 quality, uint256 uniqueness) external;
+    function updateWeights(address[] memory validators, uint256[] memory weights) external;
+    function addRewardForValidators(uint256 validatorsRewardAmount) external;
+    function addRewardsForContributors(uint256 contributorsRewardAmount) external;
     function claimContributionReward(uint256 fileId) external;
     function claimUnsentReward(address validatorAddress, uint256 epochNumber) external;
 }
