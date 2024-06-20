@@ -18,7 +18,7 @@ npx hardhat test
 ```
 DEPLOYER_PRIVATE_KEY=8...7
 OWNER_ADDRESS=0x3....1
-SATORI_RPC_URL=http://rpc.satori.vana.org
+SATORI_RPC_URL=https://rpc.satori.vana.org
 ```
 6. Deploy the DataLiquidityPoolsRoot smart contract
 
