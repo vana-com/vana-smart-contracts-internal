@@ -274,6 +274,7 @@ contract DataLiquidityPool is
     }
 
     struct InitParams {
+        string name;
         address ownerAddress;
         address tokenAddress;
         uint256 newMaxNumberOfValidators;
@@ -301,6 +302,7 @@ contract DataLiquidityPool is
         __Pausable_init();
         __AccessControl_init();
 
+        name = params.name;
         maxNumberOfValidators = params.newMaxNumberOfValidators;
         validatorScoreMinTrust = params.newValidatorScoreMinTrust;
         validatorScoreKappa = params.newValidatorScoreKappa;

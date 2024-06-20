@@ -22,7 +22,7 @@ describe("ERC20Swapper", () => {
   const deploy = async () => {
     [deployer, owner, admin, user1, user2, user3, user4] = await ethers.getSigners();
 
-    dlpt = await ethers.deployContract("DLPT", [owner.address]);
+    dlpt = await ethers.deployContract("DLPT", ["Test Data Autonomy Token", "TDAT", owner.address]);
     await dlpt.waitForDeployment();
 
     await dlpt.connect(owner).changeAdmin(admin);
@@ -39,8 +39,8 @@ describe("ERC20Swapper", () => {
     it("should have correct params after deploy", async function () {
       (await dlpt.owner()).should.eq(owner);
       (await dlpt.admin()).should.eq(admin);
-      (await dlpt.name()).should.eq("DLP Token");
-      (await dlpt.symbol()).should.eq("DLPT");
+      (await dlpt.name()).should.eq("Test Data Autonomy Token");
+      (await dlpt.symbol()).should.eq("TDAT");
       (await dlpt.mintBlocked()).should.eq(false);
     });
 

@@ -48,6 +48,9 @@ describe("DataLiquidityPool", () => {
   let dlp: DataLiquidityPool;
   let dlpt: DLPT;
 
+  const dlpName = "Test DLP";
+  const dlpTokenName = "Test Data Autonomy Token";
+  const dlpTokenSymbol = "TDAT";
   const maxNumberOfValidators = 9;
   const validatorScoreMinTrust = parseEther('0.1');
   const validatorScoreKappa = parseEther('0.5');
@@ -76,7 +79,7 @@ describe("DataLiquidityPool", () => {
       user1, user2, user3, user4, user5, user6, user7, user8, user9, user10, user11, user12, user13, user14, user15
     ] = await ethers.getSigners();
 
-    const dlptDeploy = await ethers.deployContract("DLPT", [owner]);
+    const dlptDeploy = await ethers.deployContract("DLPT", [dlpTokenName, dlpTokenSymbol, owner]);
     dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
 
     startBlock = await getCurrentBlockNumber() + 1;
@@ -84,6 +87,7 @@ describe("DataLiquidityPool", () => {
     const dlpDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("DataLiquidityPool"),
       [[
+        dlpName,
         owner.address,
         dlpt.target,
         maxNumberOfValidators,
@@ -152,6 +156,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should have correct params after deploy", async function () {
+      (await dlp.name()).should.eq(dlpName);
       (await dlp.owner()).should.eq(owner);
       (await dlp.maxNumberOfValidators()).should.eq(maxNumberOfValidators);
       (await dlp.validatorScoreMinTrust()).should.eq(validatorScoreMinTrust);

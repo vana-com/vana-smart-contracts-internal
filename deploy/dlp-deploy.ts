@@ -8,9 +8,13 @@ import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const [deployer] = await ethers.getSigners();
 
+	const dlpName = process.env.DLP_NAME ?? "Custom Data Liquidity Pool";
 	const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-	const dlptDeploy = await ethers.deployContract("DLPT", [deployer.address]);
+	const tokenName = process.env.DLP_TOKEN_NAME ?? "Custom Data Autonomy Token";
+	const tokenSymbol = process.env.DLP_TOKEN_SYMBOL ?? "CUSTOMDAT";
+
+	const dlptDeploy = await ethers.deployContract("DLPT", [tokenName, tokenSymbol, ownerAddress]);
 	const dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
 
 	console.log("DataLiquidityPoolToken deployed at:", dlptDeploy.target);
@@ -30,6 +34,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const dlpDeploy = await upgrades.deployProxy(
 		await ethers.getContractFactory("DataLiquidityPool"),
 		[{
+			name: dlpName,
 			ownerAddress,
 			tokenAddress: dlptDeploy.target,
 			newMaxNumberOfValidators: maxNumberOfValidators,
@@ -48,9 +53,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			kind: "uups"
 		}
 	);
-	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);	
+	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
 
-	console.log("DataLiquidityPool deployed at:", dlp.target);
+	console.log(`DataLiquidityPool "${dlpName}" deployed at:`, dlp.target);
 
 	await new Promise((resolve) => setTimeout(resolve, 10000));
 

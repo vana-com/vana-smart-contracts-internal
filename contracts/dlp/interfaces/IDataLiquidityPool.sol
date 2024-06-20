@@ -61,6 +61,7 @@ interface IDataLiquidityPool is IAccessControl {
         mapping(uint256 => uint256) fileIds;
     }
 
+    function name() external view returns (string memory);
     function version() external pure returns (uint256);
     function token() external view returns (IERC20);
     function masterKey() external view returns (string memory);

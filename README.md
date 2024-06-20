@@ -13,12 +13,16 @@ yarn install
 npx hardhat test
 ```
 
-5. Create an `.env` file for the smart contract repo. You will need the owner address and private key.
+5. Create an `.env` file for the smart contract repo. You will need the owner address and private key. Customize the DLP name, token name, and token symbol as needed.
 
 ```
 DEPLOYER_PRIVATE_KEY=8...7
 OWNER_ADDRESS=0x3....1
 SATORI_RPC_URL=http://rpc.satori.vana.org
+
+DLP_NAME=Custom Data Liquidity Pool
+DLP_TOKEN_NAME=Custom Data Autonomy Token
+DLP_TOKEN_SYMBOL=CUSTOMDAT
 ```
 6. Deploy the DataLiquidityPoolsRoot smart contract
 
@@ -46,8 +50,10 @@ This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart cont
 
 ```bash
 npx hardhat verify --network satori <data_liquidity_pool_address>
-npx hardhat verify --network satori <data_liquidity_pool_token_address> <owner_address>
+npx hardhat verify --network satori <data_liquidity_pool_token_address> "<token_name>" <token_symbol> <owner_address>
 ```
+
+If you get an error, it may be because the block explorer has already verified matching bytecode. Check your contract in the block explorer. If it is verified, you can ignore the error.
 
 10. Congratulations, you've deployed the DLP Root, DLP, and token smart contracts. You can confirm they are up by searching the addresses on the block explorer: https://satori.vanascan.org/address/<contract_address>.
 
