@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  * contract which implements DataLiquidityPoolStorageV1
  */
 abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
+    string public override name;
     IERC20 public override token;
     string public override masterKey;
     uint256 public override maxNumberOfValidators;

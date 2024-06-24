@@ -4,7 +4,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const dlpDeploy = await upgrades.upgradeProxy(
-		process.env.DLP_CONTRACT_ADDRESS,
+		process.env.DLP_CONTRACT_ADDRESS as string,
 		await ethers.getContractFactory("DataLiquidityPool"),
 	);
 

@@ -78,7 +78,11 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         _;
     }
 
-    constructor(address ownerAddress) ERC20("DLP Token", "DLPT") ERC20Permit("DLP Token") Ownable(ownerAddress) {}
+    constructor(string memory name, string memory symbol, address ownerAddress)
+    ERC20(name, symbol)
+    ERC20Permit(name)
+    Ownable(ownerAddress)
+    {}
 
     // Overrides IERC6372 functions to make the token & governor timestamp-based
     function clock() public view override returns (uint48) {
