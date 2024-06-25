@@ -34,7 +34,7 @@ npx hardhat verify --network satori <data_liquidity_pool_address>
 npx hardhat verify --network satori <data_liquidity_pool_token_address> <owner_address>
 ```
 
-8. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.org/address/<contract_address>. 
+8. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: [https://satori.vanascan.org](https://satori.vanascan.io/address/<contract_address>. 
 
 
 
