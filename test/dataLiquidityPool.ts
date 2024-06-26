@@ -1911,6 +1911,38 @@ describe("DataLiquidityPool", () => {
       fileScore.uniqueness.should.eq(parseEther('0.6'));
     });
 
+    it("should get next unverified file for validator", async function () {
+      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
+      await dlp.connect(owner).approveValidator(v1);
+
+      // Add multiple files
+      await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
+      await dlp.connect(user1).addFile('file2URL', "file2EncryptedAddress");
+      await dlp.connect(user1).addFile('file3URL', "file3EncryptedAddress");
+
+      // Verify the first file
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'), parseEther('0.5'), parseEther('0.7'), parseEther('0.8'), parseEther('0.4'));
+
+      // Get next file to verify
+      let nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(2);
+
+      // Verify the second file
+      await dlp.connect(v1).verifyFile(2, true, parseEther('0.7'), parseEther('0.6'), parseEther('0.8'), parseEther('0.9'), parseEther('0.5'));
+
+      // Get next file to verify
+      nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(3);
+
+      // Verify the third file
+      await dlp.connect(v1).verifyFile(3, true, parseEther('0.8'), parseEther('0.7'), parseEther('0.9'), parseEther('1.0'), parseEther('0.6'));
+
+      // Get next file to verify when all files are verified
+      nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(0); // Should return 0 when no more files to verify
+    });
+
     it("should verifyFile by multiple validators", async function () {
       await registerValidators();
 
