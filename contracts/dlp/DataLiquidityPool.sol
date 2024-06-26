@@ -77,7 +77,7 @@ contract DataLiquidityPool is
      * @notice Triggered when a validator has been deregistered by the dlp owner
      *
      * @param validatorAddress                   address of the validator
-     * @param unstakedAmmount                    amount unstaked
+     * @param unstakedAmount                    amount unstaked
      * @param penaltyAmount                      penalty amount
      */
     event ValidatorDeregisteredByOwner(address indexed validatorAddress, uint256 unstakedAmount, uint256 penaltyAmount);
@@ -344,7 +344,7 @@ contract DataLiquidityPool is
             uniqueness: file.uniqueness,
             reward: file.reward,
             rewardWithdrawn: file.rewardWithdrawn,
-            verificationsLength: file.verificationsLength
+            verificationsCount: file.verificationsCount
         });
     }
 
@@ -416,19 +416,8 @@ contract DataLiquidityPool is
             firstBlockNumber: validator.firstBlockNumber,
             lastBlockNumber: validator.lastBlockNumber,
             grantedAmount: validator.grantedAmount,
-            filesToVerifyIndex: validator.filesToVerifyIndex,
-            filesToVerifyCount: validator.filesToVerifyCount
+            lastVerifiedFile: validator.lastVerifiedFile
         });
-    }
-
-    /**
-     * @notice Get the file to verify
-     *
-     * @param validatorAddress                   address of the validator
-     * @param index                             index of the file
-     */
-    function validatorFilesToVerify(address validatorAddress, uint256 index) external view override returns (FileResponse memory) {
-        return files(_validatorsInfo[validatorAddress].filesToVerify[index]);
     }
 
     /**
@@ -436,37 +425,15 @@ contract DataLiquidityPool is
      *
      * @param validatorAddress                   address of the validator
      */
-    function getNextFileToVerify(address validatorAddress) public view override returns (NextFileToVerify memory) {
+    function getNextFileToVerify(address validatorAddress) public view override returns (FileResponse memory) {
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
         if (validator.status != ValidatorStatus.Active) {
             revert InvalidValidatorStatus();
         }
 
-        uint256 nextFileId = 0;
-        uint256 earliestAddedTimestamp = type(uint256).max;
+        uint256 nextFileId = validator.lastVerifiedFile + 1;
 
-        // TODO: don't start from 1. We'll need some way of dealing with some files not getting verified by every validator.
-        for (uint256 i = 1; i <= _fileUrlHashes.length(); i++) {
-            File storage file = _files[i];
-            if (file.scores[validatorAddress].reportedAtBlock == 0 &&
-                file.addedTimestamp < earliestAddedTimestamp) {
-                nextFileId = i;
-                earliestAddedTimestamp = file.addedTimestamp;
-            }
-        }
-
-        if (nextFileId == 0) {
-            return NextFileToVerify(0, "", "", 0, address(0));
-        }
-
-        File storage nextFile = _files[nextFileId];
-        return NextFileToVerify({
-            fileId: nextFileId,
-            url: nextFile.url,
-            encryptedKey: nextFile.encryptedKey,
-            addedTime: nextFile.addedTimestamp,
-            assignedValidator: validatorAddress
-        });
+        return files(nextFileId > _fileUrlHashes.length() ? 0 : nextFileId);
     }
 
     /**
@@ -871,10 +838,10 @@ contract DataLiquidityPool is
             uniqueness: uniqueness
         });
 
-        file.verificationsLength++;
+        file.verificationsCount++;
 
         // Update file's overall scores if this is the first verification
-        if (file.verificationsLength == 1) {
+        if (file.verificationsCount == 1) {
             file.valid = valid;
             file.score = score;
             file.authenticity = authenticity;
@@ -885,11 +852,12 @@ contract DataLiquidityPool is
         } else {
             // Aggregate scores
             file.valid = file.valid && valid;
-            file.score = (file.score * (file.verificationsLength - 1) + score) / file.verificationsLength;
-            file.authenticity = (file.authenticity * (file.verificationsLength - 1) + authenticity) / file.verificationsLength;
-            file.ownership = (file.ownership * (file.verificationsLength - 1) + ownership) / file.verificationsLength;
-            file.quality = (file.quality * (file.verificationsLength - 1) + quality) / file.verificationsLength;
-            file.uniqueness = (file.uniqueness * (file.verificationsLength - 1) + uniqueness) / file.verificationsLength;
+            file.score = (file.score * (file.verificationsCount - 1) + score) / file.verificationsCount;
+            file.authenticity = (file.authenticity * (file.verificationsCount - 1) + authenticity) / file.verificationsCount;
+            file.ownership = (file.ownership * (file.verificationsCount - 1) + ownership) / file.verificationsCount;
+            file.quality = (file.quality * (file.verificationsCount - 1) + quality) / file.verificationsCount;
+            file.uniqueness = (file.uniqueness * (file.verificationsCount - 1) + uniqueness) / file.verificationsCount;
+            file.reward = (file.score * fileRewardFactor) / 1e18;
         }
 
         emit FileVerified(msg.sender, fileId, score);

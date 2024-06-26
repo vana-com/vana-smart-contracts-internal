@@ -19,9 +19,7 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 firstBlockNumber;
         uint256 lastBlockNumber;
         uint256 grantedAmount;
-        uint256 filesToVerifyIndex;
-        uint256 filesToVerifyCount;
-        mapping(uint256 => uint256) filesToVerify;
+        uint256 lastVerifiedFile;
         mapping(address => uint256) weights;
     }
 
@@ -40,7 +38,7 @@ interface IDataLiquidityPool is IAccessControl {
         string url;
         string encryptedKey;
         uint256 addedTimestamp;
-        uint256 verificationsLength;
+        uint256 verificationsCount;
         uint256 addedAtBlock;
         bool valid;
         uint256 score;
@@ -51,6 +49,7 @@ interface IDataLiquidityPool is IAccessControl {
         mapping(address => FileScore) scores;
         uint256 reward;
         uint256 rewardWithdrawn;
+        uint256 validatorScoreCount;
     }
 
     struct ValidatorReward {
@@ -106,15 +105,7 @@ interface IDataLiquidityPool is IAccessControl {
     function fileRewardFactor() external view returns (uint256);
     function fileRewardDelay() external view returns (uint256);
 
-    struct NextFileToVerify {
-        uint256 fileId;
-        string url;
-        string encryptedKey;
-        uint256 addedTime;
-        address assignedValidator;
-    }
-
-    function getNextFileToVerify(address validatorAddress) external view returns (NextFileToVerify memory);
+    function getNextFileToVerify(address validatorAddress) external view returns (FileResponse memory);
 
     struct FileResponse {
         uint256 fileId;
@@ -131,7 +122,7 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 uniqueness;
         uint256 reward;
         uint256 rewardWithdrawn;
-        uint256 verificationsLength;
+        uint256 verificationsCount;
     }
 
     function filesCount() external view returns (uint256);
@@ -146,12 +137,10 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 firstBlockNumber;
         uint256 lastBlockNumber;
         uint256 grantedAmount;
-        uint256 filesToVerifyIndex;
-        uint256 filesToVerifyCount;
+        uint256 lastVerifiedFile;
     }
 
     function validators(uint256 index) external view returns (ValidatorInfoResponse memory);
-    function validatorFilesToVerify(address validatorAddress, uint256 index) external view returns (FileResponse memory);
     function validatorsInfo(address validatorAddress) external view returns (ValidatorInfoResponse memory);
     function validatorWeights(address validatorAddress) external view returns (address[] memory validators, uint256[] memory weights);
     function fileScores(uint256 fileId, address validatorAddress) external view returns (FileScore memory);
