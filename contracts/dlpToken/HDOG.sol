@@ -8,7 +8,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
+contract HDOG is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     address public admin;
@@ -78,7 +78,7 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         _;
     }
 
-    constructor(address ownerAddress) ERC20("DLP Token", "DLPT") ERC20Permit("DLP Token") Ownable(ownerAddress) {}
+    constructor(address ownerAddress) ERC20("HDOG Token", "HDOG") ERC20Permit("HDOG Token") Ownable(ownerAddress) {}
 
     // Overrides IERC6372 functions to make the token & governor timestamp-based
     function clock() public view override returns (uint48) {
