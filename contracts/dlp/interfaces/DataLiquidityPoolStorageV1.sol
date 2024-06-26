@@ -25,6 +25,9 @@ abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
     uint256 public override validatorScoreKappa;
     uint256 public override validatorScoreRho;
     uint256 public override fileRewardDelay;
+    uint256 public nextFileToVerifyId;
+    uint256 public lastAddedFileId;
+
 
     uint256 public override validatorsCount;
     mapping(uint256 => address) internal _validators;
@@ -36,6 +39,7 @@ abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
 
     mapping(uint256 => File) internal _files;
     EnumerableSet.Bytes32Set internal _fileUrlHases;
+    mapping(uint256 => bool) public verifiedFiles;
 
     uint256 public override epochsCount;
     mapping(uint256 => Epoch) internal _epochs;

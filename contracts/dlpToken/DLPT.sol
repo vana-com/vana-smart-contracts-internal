@@ -8,7 +8,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
+contract HDOG is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     address public admin;
@@ -31,7 +31,7 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     /**
      * @dev Emitted when and address is added to the blockList
      *
-     * @param blockedAddress    the address to be blocked 
+     * @param blockedAddress    the address to be blocked
      */
     event AddressBlocked(address indexed blockedAddress);
 
@@ -78,13 +78,13 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         _;
     }
 
-    constructor(address ownerAddress) ERC20("DLP Token", "DLPT") ERC20Permit("DLP Token") Ownable(ownerAddress) {}
+    constructor(address ownerAddress) ERC20("HDOG Token", "HDOG") ERC20Permit("HDOG Token") Ownable(ownerAddress) {}
 
     // Overrides IERC6372 functions to make the token & governor timestamp-based
     function clock() public view override returns (uint48) {
         return uint48(block.timestamp);
     }
-    
+
     // solhint-disable-next-line func-name-mixedcase
     function CLOCK_MODE() public pure override returns (string memory) {
         return "mode=timestamp";
@@ -116,7 +116,7 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     function changeAdmin(address newAdmin) external virtual onlyOwner {
         address oldAdmin = admin;
         admin = newAdmin;
-        emit AdminChanged(oldAdmin, newAdmin);(oldAdmin, newAdmin);
+        emit AdminChanged(oldAdmin, newAdmin);
     }
 
     /**

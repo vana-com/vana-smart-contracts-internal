@@ -28,20 +28,32 @@ interface IDataLiquidityPool is IAccessControl {
 
     struct FileVerificationInfo {
         address validatorAddress;
-        uint256 timespatmp;
+        uint256 reportedAt;
+        uint256 reportedAtBlock;
         uint256 score;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
         string metadata;
     }
 
     struct File {
         address contributorAddress;
-        uint256 addedTimestamp;
+        uint256 addedAt;
         uint256 verificationsCount;
         string url;
         string encryptedKey;
         uint256 reward;
         uint256 rewardWithdrawn;
-        mapping(uint256 => FileVerificationInfo) verifications;
+        bool isVerified;
+        uint256 addedAtBlock;
+        uint256 overallScore;
+        uint256 authenticity;
+        uint256 ownership;
+        uint256 quality;
+        uint256 uniqueness;
+        mapping(address => FileVerificationInfo) verifications;
     }
 
     struct ValidatorReward {
@@ -79,18 +91,17 @@ interface IDataLiquidityPool is IAccessControl {
     function epochRewardAmount() external view returns (uint256);
     function fileRewardFactor() external view returns (uint256);
     function fileRewardDelay() external view returns (uint256);
-    function getNextFileToVerify(
-        address validatorAddress
-    ) external view returns (NextFileToVerify memory);
+    function getNextFileToVerify() external view returns (NextFileToVerify memory);
     struct FileResponse {
         uint256 fileId;
         address contributorAddress;
         string url;
         string encryptedKey;
-        uint256 addedTimestamp;
+        uint256 addedAt;
         uint256 reward;
         uint256 rewardWithdrawn;
         uint256 verificationsCount;
+        bool isVerified;
     }
     function files(uint256 fileId) external view returns (FileResponse memory);
     function validatorsCount() external view returns (uint256);
@@ -113,7 +124,7 @@ interface IDataLiquidityPool is IAccessControl {
     ) external view returns (ValidatorInfoResponse memory);
     function fileVerifications(
         uint256 fileId,
-        uint256 verificationId
+        address validatorAddress
     )
         external
         view
@@ -166,6 +177,21 @@ interface IDataLiquidityPool is IAccessControl {
         string url;
         string encryptedKey;
         uint256 addedTime;
-        address assignedValidator;
     }
+
+    function getFileInfo(uint256 fileId) external view returns (
+        address contributorAddress,
+        uint256 addedAt,
+        uint256 verificationsCount,
+        bool isVerified,
+        uint256 overallScore,
+        uint256 authenticity,
+        uint256 ownership,
+        uint256 quality,
+        uint256 uniqueness,
+        FileVerificationInfo[] memory validatorScores
+    );
+
+    function nextFileToVerifyId() external view returns (uint256);
+    function lastAddedFileId() external view returns (uint256);
 }

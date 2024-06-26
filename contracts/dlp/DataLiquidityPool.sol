@@ -229,6 +229,9 @@ contract DataLiquidityPool is
     error InvalidFileId();
     error ArityMismatch();
     error NotFileOwner();
+    error FileNotVerified();
+    error VerificationDeadlineExceeded();
+    error ValidatorAlreadyVerified();
 
     /**
      * @dev Modifier to make a function callable only when the caller is an active validator
@@ -355,31 +358,32 @@ contract DataLiquidityPool is
             _files[fileId].contributorAddress,
             _files[fileId].url,
             _files[fileId].encryptedKey,
-            _files[fileId].addedTimestamp,
+            _files[fileId].addedAt,
             _files[fileId].reward,
             _files[fileId].rewardWithdrawn,
-            _files[fileId].verificationsCount
+            _files[fileId].verificationsCount,
+            _files[fileId].isVerified
         );
     }
 
     /**
-     * @notice Get the file verifications
-     *
-     * @param fileId                              file id
-     * @param verificationId                      verification id
+     * @notice Get the file verification for a specific validator
+     * @param fileId The ID of the file
+     * @param validatorAddress The address of the validator
+     * @return FileVerificationInfo The verification information
      */
     function fileVerifications(
         uint256 fileId,
-        uint256 verificationId
+        address validatorAddress
     )
-        external
-        view
-        override
-        returns (
-            FileVerificationInfo memory
-        )
+    external
+    view
+    override
+    returns (
+        FileVerificationInfo memory
+    )
     {
-        return _files[fileId].verifications[verificationId];
+        return _files[fileId].verifications[validatorAddress];
     }
 
     /**
@@ -465,81 +469,22 @@ contract DataLiquidityPool is
         return _validatorsWithFilesToVerify.values();
     }
 
+
     /**
-     * @notice Get the next file to verify
-     *
-     * @param validatorAddress                   address of the validator
+     * @notice Get the next file to verify for any validator
+     * @return NextFileToVerify struct containing file information
      */
-    function getNextFileToVerify(
-        address validatorAddress
-    ) public view override returns (NextFileToVerify memory) {
-        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
-        if (validator.status != ValidatorStatus.Active) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Active),
-                uint256(validator.status)
-            );
-        }
-
-        uint256 nextFileId = validator.filesToVerify[
-            validator.filesToVerifyIndex + 1
-        ];
-
-        File storage file = _files[nextFileId];
-
-        if (
-            nextFileId > 0 &&
-            file.addedTimestamp + validationPeriod < block.timestamp
-        ) {
-            return
-                NextFileToVerify(
-                    nextFileId,
-                    file.url,
-                    file.encryptedKey,
-                    file.addedTimestamp,
-                    validatorAddress
-                );
-        }
-
-        address assignedValidator = validatorAddress;
-
-        uint256 validatorsWithFilesToVerifyCount = _validatorsWithFilesToVerify
-            .length();
-
-        File storage otherValidatorFile;
-        for (
-            uint256 index = 0;
-            index < validatorsWithFilesToVerifyCount;
-            index++
-        ) {
-            validator = _validatorsInfo[_validatorsWithFilesToVerify.at(index)];
-
-            uint256 otherValidatorNextFileId = validator.filesToVerify[
-                validator.filesToVerifyIndex + 1
-            ];
-
-            otherValidatorFile = _files[otherValidatorNextFileId];
-
-            if (
-                otherValidatorNextFileId > 0 &&
-                otherValidatorFile.addedTimestamp + validationPeriod <
-                block.timestamp &&
-                otherValidatorFile.addedTimestamp < file.addedTimestamp
-            ) {
-                nextFileId = otherValidatorNextFileId;
-                file = otherValidatorFile;
-                assignedValidator = _validatorsWithFilesToVerify.at(index);
-            }
-        }
-
-        return
-            NextFileToVerify(
-                nextFileId,
+    function getNextFileToVerify() public view returns (NextFileToVerify memory) {
+        File storage file = _files[nextFileToVerifyId];
+        if (nextFileToVerifyId > 0 && !verifiedFiles[nextFileToVerifyId] && block.timestamp >= file.addedAt + validationPeriod) {
+            return NextFileToVerify(
+                nextFileToVerifyId,
                 file.url,
                 file.encryptedKey,
-                file.addedTimestamp,
-                assignedValidator
+                file.addedAt
             );
+        }
+        return NextFileToVerify(0, "", "", 0);
     }
 
     /**
@@ -993,21 +938,16 @@ contract DataLiquidityPool is
         emit MasterKeySet(newMasterKey);
     }
 
+
     /**
      * @notice Add a file to the pool
-     *
-     * @param url                                    file url
-     * @param encryptedKey                           encrypted key
+     * @param url File URL
+     * @param encryptedKey Encrypted key for the file
      */
-    function addFile(
-        string memory url,
-        string memory encryptedKey
-    ) external whenNotPaused {
+    function addFile(string memory url, string memory encryptedKey) external whenNotPaused {
         createEpochs();
         bytes32 urlHash = keccak256(abi.encodePacked(url));
-        if (_fileUrlHases.contains(urlHash)) {
-            revert FileAlreadyAdded();
-        }
+        require(!_fileUrlHases.contains(urlHash), "FileAlreadyAdded");
 
         _fileUrlHases.add(urlHash);
         uint256 filesId = _fileUrlHases.length();
@@ -1017,21 +957,14 @@ contract DataLiquidityPool is
         file.contributorAddress = msg.sender;
         file.url = url;
         file.encryptedKey = encryptedKey;
-        file.addedTimestamp = block.timestamp;
+        file.addedAt = block.timestamp;
+        file.addedAtBlock = block.number;
+        file.isVerified = false;
 
-        uint256 epochValidatorsListId = _epochs[epochsCount].validatorsListId;
-
-        uint256 epochValidatorsCount = _activeValidatorsLists[
-            epochValidatorsListId
-        ].length();
-
-        address assignedValidator = _activeValidatorsLists[
-            epochValidatorsListId
-        ].at(filesId % epochValidatorsCount);
-
-        ValidatorInfo storage validator = _validatorsInfo[assignedValidator];
-        validator.filesToVerifyCount++;
-        validator.filesToVerify[validator.filesToVerifyCount] = filesId;
+        if (nextFileToVerifyId == 0) {
+            nextFileToVerifyId = filesId;
+        }
+        lastAddedFileId = filesId;
 
         ContributorInfo storage contributor = _contributorInfo[msg.sender];
         contributor.fileIdsCount++;
@@ -1041,63 +974,149 @@ contract DataLiquidityPool is
     }
 
     /**
-     * @notice Verify a file
-     *
-     * @param fileId                              file id
-     * @param score                               score of the verification
-     * @param metadata                            metadata
+     * @notice Find the next unverified file ID
+     * @param startId The ID to start searching from
+     * @param endId The ID to end searching at
+     * @return The ID of the next unverified file, or 0 if none found
+     */
+    function findNextUnverifiedFile(uint256 startId, uint256 endId) internal view returns (uint256) {
+        for (uint256 i = startId; i <= endId; i++) {
+            if (!verifiedFiles[i] && _files[i].addedAt > 0) {
+                return i;
+            }
+        }
+        return 0; // No more files to verify
+    }
+
+    /**
+     * @notice Verify a file and update its scores
+     * @param fileId The ID of the file to verify
+     * @param score The overall score given by the validator
+     * @param authenticity The authenticity score
+     * @param ownership The ownership score
+     * @param quality The quality score
+     * @param uniqueness The uniqueness score
+     * @param metadata Additional metadata about the verification
      */
     function verifyFile(
         uint256 fileId,
         uint256 score,
+        uint256 authenticity,
+        uint256 ownership,
+        uint256 quality,
+        uint256 uniqueness,
         string memory metadata
     ) external onlyActiveValidators {
         createEpochs();
 
-        if (_files[fileId].verificationsCount > 0) {
-            revert FileAlreadyVerified();
-        }
-
-        NextFileToVerify memory nextFileToVerify = getNextFileToVerify(
-            msg.sender
-        );
-
-        if (nextFileToVerify.fileId != fileId || fileId == 0) {
-            revert InvalidFileId();
-        }
-
         File storage file = _files[fileId];
+        require(file.addedAt > 0, "Invalid fileId");
+        require(block.timestamp >= file.addedAt + validationPeriod, "Validation period not yet elapsed");
 
-        FileVerificationInfo storage verification = file.verifications[
-            file.verificationsCount
-        ];
+        FileVerificationInfo storage verification = file.verifications[msg.sender];
+        require(verification.reportedAt == 0, "File already verified by this validator");
+
+        verification.validatorAddress = msg.sender;
+        verification.reportedAt = block.timestamp;
+        verification.reportedAtBlock = block.number;
+        verification.score = score;
+        verification.authenticity = authenticity;
+        verification.ownership = ownership;
+        verification.quality = quality;
+        verification.uniqueness = uniqueness;
+        verification.metadata = metadata;
 
         file.verificationsCount++;
 
-        verification.validatorAddress = msg.sender;
-        // TODO: fix spelling
-        verification.timespatmp = block.timestamp;
-        verification.score = score;
-        verification.metadata = metadata;
+        // Update overall scores
+        updateOverallScores(fileId);
 
-        file.reward = score * fileRewardFactor / 1e18;
+        // Only set the reward if the file is considered valid
+        if (file.isVerified) {
+            file.reward = score * fileRewardFactor / 1e18;
+        }
 
-        ValidatorInfo storage validator = _validatorsInfo[
-            nextFileToVerify.assignedValidator
-        ];
-        validator.filesToVerifyIndex++;
-
-        if (
-            validator.filesToVerifyIndex == validator.filesToVerifyCount &&
-            validator.status != ValidatorStatus.Active &&
-            nextFileToVerify.assignedValidator != address(0)
-        ) {
-            _validatorsWithFilesToVerify.remove(
-                nextFileToVerify.assignedValidator
-            );
+        // Update nextFileToVerifyId if the current file is verified
+        if (file.isVerified) {
+            verifiedFiles[fileId] = true;
+            if (fileId == nextFileToVerifyId) {
+                nextFileToVerifyId = findNextUnverifiedFile(fileId + 1, lastAddedFileId);
+            }
         }
 
         emit FileVerified(msg.sender, fileId, score);
+    }
+
+    function getFileVerification(uint256 fileId, address validatorAddress) public view returns (FileVerificationInfo memory) {
+        return _files[fileId].verifications[validatorAddress];
+    }
+
+    /**
+     * @notice Update overall scores for a file
+     * @param fileId The ID of the file to update
+     */
+    function updateOverallScores(uint256 fileId) internal {
+        File storage file = _files[fileId];
+        uint256 totalScore = 0;
+        uint256 totalAuthenticity = 0;
+        uint256 totalOwnership = 0;
+        uint256 totalQuality = 0;
+        uint256 totalUniqueness = 0;
+
+        address[] memory activeValidators = getActiveValidators();
+        uint256 verificationCount = 0;
+
+        for (uint256 i = 0; i < activeValidators.length; i++) {
+            FileVerificationInfo storage verification = file.verifications[activeValidators[i]];
+            if (verification.reportedAt > 0) {
+                totalScore += verification.score;
+                totalAuthenticity += verification.authenticity;
+                totalOwnership += verification.ownership;
+                totalQuality += verification.quality;
+                totalUniqueness += verification.uniqueness;
+                verificationCount++;
+            }
+        }
+
+        if (verificationCount > 0) {
+            file.overallScore = totalScore / verificationCount;
+            file.authenticity = totalAuthenticity / verificationCount;
+            file.ownership = totalOwnership / verificationCount;
+            file.quality = totalQuality / verificationCount;
+            file.uniqueness = totalUniqueness / verificationCount;
+
+            // Set isVerified to true only if there's a majority and the overall score is above a threshold
+            uint256 scoreThreshold = 5e17; // 0.5 in WAD format
+            if (verificationCount > activeValidators.length / 2 && file.overallScore >= scoreThreshold) {
+                file.isVerified = true;
+            }
+        }
+    }
+
+    /** @notice Calculates the reward for a verified file
+     * @param file The File struct of the verified file
+     * @return The calculated reward
+     */
+    function calculateFileReward(File storage file) internal view returns (uint256) {
+        uint256 totalScore = 0;
+        uint256 validVerifications = 0;
+
+        address[] memory activeValidators = _activeValidatorsLists[activeValidatorsListsCount].values();
+
+        for (uint256 i = 0; i < activeValidators.length; i++) {
+            FileVerificationInfo storage verification = file.verifications[activeValidators[i]];
+            if (verification.reportedAt != 0) {
+                totalScore += verification.score;
+                validVerifications++;
+            }
+        }
+
+        if (validVerifications == 0) {
+            return 0;
+        }
+
+        uint256 averageScore = totalScore / validVerifications;
+        return averageScore * fileRewardFactor / 1e18;
     }
 
     /**
@@ -1190,11 +1209,16 @@ contract DataLiquidityPool is
             revert NotFileOwner();
         }
 
-        if (file.rewardWithdrawn > 0 || file.addedTimestamp + fileRewardDelay > block.timestamp || totalContributorsRewardAmount < file.reward) {
+        if (file.rewardWithdrawn > 0 || file.addedAt + fileRewardDelay > block.timestamp || totalContributorsRewardAmount < file.reward) {
             revert WithdrawNotAllowed();
         }
 
+        if (!file.isVerified) {
+            revert FileNotVerified();
+        }
+
         file.rewardWithdrawn = file.reward;
+        totalContributorsRewardAmount -= file.reward;
         token.safeTransfer(msg.sender, file.reward);
 
         emit ContributionRewardClaimed(msg.sender, fileId, file.reward);
@@ -1525,5 +1549,63 @@ contract DataLiquidityPool is
         validator.lastBlockNumber = block.number;
 
         emit ValidatorInactivated(validatorAddress);
+    }
+
+    /**
+     * @notice Get all active validators
+     *
+     * @return address[]                          active validators
+     */
+    function getActiveValidators() public view returns (address[] memory) {
+        uint256 currentValidatorsListId = _epochs[epochsCount].validatorsListId;
+        return _activeValidatorsLists[currentValidatorsListId].values();
+    }
+
+    /**
+     * @notice Get detailed information about a file, including all validator scores
+     * @param fileId The ID of the file to retrieve information for
+     */
+    function getFileInfo(uint256 fileId) external view returns (
+        address contributorAddress,
+        uint256 addedAt,
+        uint256 verificationsCount,
+        bool isVerified,
+        uint256 overallScore,
+        uint256 authenticity,
+        uint256 ownership,
+        uint256 quality,
+        uint256 uniqueness,
+        FileVerificationInfo[] memory validatorScores
+    ) {
+        File storage file = _files[fileId];
+        address[] memory activeValidators = getActiveValidators();
+        FileVerificationInfo[] memory scores = new FileVerificationInfo[](activeValidators.length);
+        uint256 scoreCount = 0;
+
+        for (uint256 i = 0; i < activeValidators.length; i++) {
+            FileVerificationInfo storage verification = file.verifications[activeValidators[i]];
+            if (verification.reportedAt > 0) {
+                scores[scoreCount] = verification;
+                scoreCount++;
+            }
+        }
+
+        // Resize the array to remove empty elements
+        assembly {
+            mstore(scores, scoreCount)
+        }
+
+        return (
+            file.contributorAddress,
+            file.addedAt,
+            file.verificationsCount,
+            file.isVerified,
+            file.overallScore,
+            file.authenticity,
+            file.ownership,
+            file.quality,
+            file.uniqueness,
+            scores
+        );
     }
 }
