@@ -860,6 +860,12 @@ contract DataLiquidityPool is
             file.reward = (file.score * fileRewardFactor) / 1e18;
         }
 
+        // Update the last verified file for this validator
+        ValidatorInfo storage validator = _validatorsInfo[msg.sender];
+        if (fileId > validator.lastVerifiedFile) {
+            validator.lastVerifiedFile = fileId;
+        }
+
         emit FileVerified(msg.sender, fileId, score);
     }
 
