@@ -10,11 +10,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-	const dlptDeploy = await ethers.deployContract("DLPT", [deployer.address]);
-	const dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
+	const dlptDeploy = await ethers.deployContract("HDOG", [deployer.address]);
+	const dlpt = await ethers.getContractAt("HDOG", dlptDeploy.target);
 
-
-	console.log("DataLiquidityPoolToken deployed at:", dlptDeploy.target);
+	console.log("HDOG Token deployed at:", dlptDeploy.target);
 
 	const maxNumberOfValidators = 3;
 	const validatorScoreMinTrust = parseEther('0.1');
@@ -46,10 +45,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			fileRewardDelay
 		],
 		{
-		  kind: "uups"
+			kind: "uups"
 		}
-	  );
-	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);	
+	);
+	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
 
 	console.log("DataLiquidityPool deployed at:", dlp.target);
 
