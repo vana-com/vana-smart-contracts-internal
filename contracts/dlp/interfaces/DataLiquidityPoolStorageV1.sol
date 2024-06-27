@@ -29,6 +29,7 @@ abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
     uint256 public override validatorScoreKappa;
     uint256 public override validatorScoreRho;
     uint256 public override fileRewardDelay;
+    uint256 public override lastFinalizedFileId;
 
     uint256 public override validatorsCount;
     mapping(uint256 => address) internal _validators;

@@ -41,6 +41,7 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 verificationsCount;
         uint256 addedAtBlock;
         bool valid;
+        bool finalized;
         uint256 score;
         uint256 authenticity;
         uint256 ownership;
@@ -104,6 +105,7 @@ interface IDataLiquidityPool is IAccessControl {
     function epochRewardAmount() external view returns (uint256);
     function fileRewardFactor() external view returns (uint256);
     function fileRewardDelay() external view returns (uint256);
+    function lastFinalizedFileId() external view returns (uint256);
 
     function getNextFileToVerify(address validatorAddress) external view returns (FileResponse memory);
 
@@ -115,6 +117,7 @@ interface IDataLiquidityPool is IAccessControl {
         uint256 addedTimestamp;
         uint256 addedAtBlock;
         bool valid;
+        bool finalized;
         uint256 score;
         uint256 authenticity;
         uint256 ownership;

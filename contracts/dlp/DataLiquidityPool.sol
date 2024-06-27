@@ -223,6 +223,7 @@ contract DataLiquidityPool is
     error NotFileOwner();
     error NotAllowed();
     error NothingToClaim();
+    error NotFinalized();
 
     /**
      * @dev Modifier to make a function callable only when the caller is an active validator
@@ -337,6 +338,7 @@ contract DataLiquidityPool is
             addedTimestamp: file.addedTimestamp,
             addedAtBlock: file.addedAtBlock,
             valid: file.valid,
+            finalized: file.finalized,
             score: file.score,
             authenticity: file.authenticity,
             ownership: file.ownership,
@@ -431,7 +433,7 @@ contract DataLiquidityPool is
             revert InvalidValidatorStatus();
         }
 
-        uint256 nextFileId = validator.lastVerifiedFile + 1;
+        uint256 nextFileId = Math.max(validator.lastVerifiedFile, lastFinalizedFileId) + 1;
 
         return files(nextFileId > _fileUrlHashes.length() ? 0 : nextFileId);
     }
@@ -823,6 +825,12 @@ contract DataLiquidityPool is
     function verifyFile(uint256 fileId, bool valid, uint256 score, uint256 authenticity, uint256 ownership, uint256 quality, uint256 uniqueness) external override onlyActiveValidators {
         createEpochs();
 
+        FileResponse memory nextFile = getNextFileToVerify(msg.sender);
+
+        if (nextFile.fileId != fileId) {
+            revert InvalidFileId();
+        }
+
         File storage file = _files[fileId];
         if (file.scores[msg.sender].reportedAtBlock != 0) {
             revert FileAlreadyVerified();
@@ -864,6 +872,11 @@ contract DataLiquidityPool is
         ValidatorInfo storage validator = _validatorsInfo[msg.sender];
         if (fileId > validator.lastVerifiedFile) {
             validator.lastVerifiedFile = fileId;
+        }
+
+        if (file.verificationsCount > _activeValidatorsLists[activeValidatorsListsCount].length() / 2) {
+            file.finalized = true;
+            lastFinalizedFileId = fileId;
         }
 
         emit FileVerified(msg.sender, fileId, score);
@@ -950,6 +963,10 @@ contract DataLiquidityPool is
 
         if (file.ownerAddress != msg.sender) {
             revert NotFileOwner();
+        }
+
+        if (!file.finalized) {
+            revert NotFinalized();
         }
 
         if (file.rewardWithdrawn > 0 ||
