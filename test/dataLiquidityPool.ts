@@ -143,7 +143,7 @@ describe("DataLiquidityPool", () => {
     await dlp.connect(owner).approveValidator(v3);
   }
 
-  async function registerValidator() {
+  async function registerValidator1() {
     await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
     await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
     await dlp.connect(owner).approveValidator(v1);
@@ -180,7 +180,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.validatorsCount()).should.eq(0);
       (await dlp.filesCount()).should.eq(0);
       (await dlp.activeValidatorsListsCount()).should.eq(0);
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
     });
 
     it("Should pause when owner", async function () {
@@ -617,7 +616,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should addFile when one validator", async function () {
-      await registerValidator();
+      await registerValidator1();
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress")
         .should.emit(dlp, 'FileAdded')
@@ -627,7 +626,7 @@ describe("DataLiquidityPool", () => {
       (await dlp.filesCount()).should.eq(1)
 
       const file1 = await dlp.files(1);
-      file1.contributorAddress.should.eq(user1);
+      file1.ownerAddress.should.eq(user1);
       file1.url.should.eq('file1URL');
       file1.encryptedKey.should.eq('file1EncryptedAddress');
       file1.addedTimestamp.should.eq(timestamp);
@@ -645,11 +644,9 @@ describe("DataLiquidityPool", () => {
       (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
 
       const validator = await dlp.validatorsInfo(v1);
-      validator.filesToVerifyCount.should.eq(1);
-      validator.filesToVerifyIndex.should.eq(0);
+      validator.lastVerifiedFile.should.eq(0);
 
-      const validatorFilesToVerify1 = await dlp.validatorFilesToVerify(v1, 1);
-      (validatorFilesToVerify1).should.deep.eq(file1);
+      (await dlp.getNextFileToVerify(v1)).should.deep.eq(file1);
     });
 
     it("should addFile when no validator", async function () {
@@ -661,7 +658,7 @@ describe("DataLiquidityPool", () => {
       (await dlp.filesCount()).should.eq(1)
 
       const file1 = await dlp.files(1);
-      file1.contributorAddress.should.eq(user1);
+      file1.ownerAddress.should.eq(user1);
       file1.url.should.eq('file1URL');
       file1.encryptedKey.should.eq('file1EncryptedAddress');
       file1.addedTimestamp.should.eq(timestamp);
@@ -679,15 +676,11 @@ describe("DataLiquidityPool", () => {
       (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
 
       const validator = await dlp.validatorsInfo(ethers.ZeroAddress);
-      validator.filesToVerifyCount.should.eq(1);
-      validator.filesToVerifyIndex.should.eq(0);
-
-      const validatorFilesToVerify1 = await dlp.validatorFilesToVerify(ethers.ZeroAddress, 1);
-      (validatorFilesToVerify1).should.deep.eq(file1);
+      validator.lastVerifiedFile.should.eq(0);
     });
 
     it("should addFile multiple times by same user", async function () {
-      await registerValidator();
+      await registerValidator1();
 
       const timestamp = await getCurrentBlockTimestamp();
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress")
@@ -700,7 +693,7 @@ describe("DataLiquidityPool", () => {
       (await dlp.filesCount()).should.eq(2)
 
       const file1 = await dlp.files(1);
-      file1.contributorAddress.should.eq(user1);
+      file1.ownerAddress.should.eq(user1);
       file1.url.should.eq('file1URL');
       file1.encryptedKey.should.eq('file1EncryptedAddress');
       file1.addedTimestamp.should.eq(timestamp + 1);
@@ -711,7 +704,7 @@ describe("DataLiquidityPool", () => {
       (await dlp.contributorFiles(user1, 1)).should.deep.eq(file1);
 
       const file2 = await dlp.files(2);
-      file2.contributorAddress.should.eq(user1);
+      file2.ownerAddress.should.eq(user1);
       file2.url.should.eq('file2URL');
       file2.encryptedKey.should.eq('file2EncryptedAddress');
       file2.addedTimestamp.should.eq(timestamp + 2);
@@ -729,14 +722,9 @@ describe("DataLiquidityPool", () => {
       (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
 
       const validator = await dlp.validatorsInfo(v1);
-      validator.filesToVerifyCount.should.eq(2);
-      validator.filesToVerifyIndex.should.eq(0);
+      validator.lastVerifiedFile.should.eq(0);
 
-      const validatorFilesToVerify1 = await dlp.validatorFilesToVerify(v1, 1);
-      (validatorFilesToVerify1).should.deep.eq(file1);
-
-      const validatorFilesToVerify2 = await dlp.validatorFilesToVerify(v1, 2);
-      (validatorFilesToVerify2).should.deep.eq(file2);
+      (await dlp.getNextFileToVerify(v1)).should.deep.eq(file1);
     });
 
     it("should addFile many users and many validators", async function () {
@@ -765,42 +753,42 @@ describe("DataLiquidityPool", () => {
         (await dlp.filesCount()).should.eq(6)
 
         const file1 = await dlp.files(1);
-        file1.contributorAddress.should.eq(user1);
+        file1.ownerAddress.should.eq(user1);
         file1.url.should.eq('file1URL');
         file1.encryptedKey.should.eq('file1EncryptedAddress');
         file1.addedTimestamp.should.eq(timestamp + 1);
         (await dlp.contributorFiles(user1, 1)).should.deep.eq(file1);
   
         const file2 = await dlp.files(2);
-        file2.contributorAddress.should.eq(user1);
+        file2.ownerAddress.should.eq(user1);
         file2.url.should.eq('file2URL');
         file2.encryptedKey.should.eq('file2EncryptedAddress');
         file2.addedTimestamp.should.eq(timestamp + 2);
         (await dlp.contributorFiles(user1, 2)).should.deep.eq(file2);
   
         const file3 = await dlp.files(3);
-        file3.contributorAddress.should.eq(user3);
+        file3.ownerAddress.should.eq(user3);
         file3.url.should.eq('file3URL');
         file3.encryptedKey.should.eq('file3EncryptedAddress');
         file3.addedTimestamp.should.eq(timestamp + 3);
         (await dlp.contributorFiles(user3, 1)).should.deep.eq(file3);
 
         const file4 = await dlp.files(4);
-        file4.contributorAddress.should.eq(user3);
+        file4.ownerAddress.should.eq(user3);
         file4.url.should.eq('file4URL');
         file4.encryptedKey.should.eq('file4EncryptedAddress');
         file4.addedTimestamp.should.eq(timestamp + 4);
         (await dlp.contributorFiles(user3, 2)).should.deep.eq(file4);
 
         const file5 = await dlp.files(5);
-        file5.contributorAddress.should.eq(user3);
+        file5.ownerAddress.should.eq(user3);
         file5.url.should.eq('file5URL');
         file5.encryptedKey.should.eq('file5EncryptedAddress');
         file5.addedTimestamp.should.eq(timestamp + 5);
         (await dlp.contributorFiles(user3, 3)).should.deep.eq(file5);
 
         const file6 = await dlp.files(6);
-        file6.contributorAddress.should.eq(user2);
+        file6.ownerAddress.should.eq(user2);
         file6.url.should.eq('file6URL');
         file6.encryptedKey.should.eq('file6EncryptedAddress');
         file6.addedTimestamp.should.eq(timestamp + 6);
@@ -824,34 +812,17 @@ describe("DataLiquidityPool", () => {
         (await dlp.contributorInfo(user2)).should.deep.eq(contributor3);
   
         const validator1 = await dlp.validatorsInfo(v1);
-        validator1.filesToVerifyCount.should.eq(2);
-        validator1.filesToVerifyIndex.should.eq(0);
+        validator1.lastVerifiedFile.should.eq(0);
 
         const validator2 = await dlp.validatorsInfo(v2);
-        validator2.filesToVerifyCount.should.eq(2);
-        validator2.filesToVerifyIndex.should.eq(0);
+        validator2.lastVerifiedFile.should.eq(0);
 
         const validator3 = await dlp.validatorsInfo(v3);
-        validator3.filesToVerifyCount.should.eq(2);
-        validator3.filesToVerifyIndex.should.eq(0);
+        validator3.lastVerifiedFile.should.eq(0);
 
-        const validator1FilesToVerify1 = await dlp.validatorFilesToVerify(v1, 1);
-        (validator1FilesToVerify1).should.deep.eq(file3);
-
-        const validator1FilesToVerify2 = await dlp.validatorFilesToVerify(v1, 2);
-        (validator1FilesToVerify2).should.deep.eq(file6);
-
-        const validator2FilesToVerify1 = await dlp.validatorFilesToVerify(v2, 1);
-        (validator2FilesToVerify1).should.deep.eq(file1);
-
-        const validator2FilesToVerify2 = await dlp.validatorFilesToVerify(v2, 2);
-        (validator2FilesToVerify2).should.deep.eq(file4);
-
-        const validator3FilesToVerify1 = await dlp.validatorFilesToVerify(v3, 1);
-        (validator3FilesToVerify1).should.deep.eq(file2);
-
-        const validator3FilesToVerify2 = await dlp.validatorFilesToVerify(v3, 2);
-        (validator3FilesToVerify2).should.deep.eq(file5);
+        (await dlp.getNextFileToVerify(v1)).should.deep.eq(file1);
+        (await dlp.getNextFileToVerify(v2)).should.deep.eq(file1);
+        (await dlp.getNextFileToVerify(v3)).should.deep.eq(file1);
     });
 
     it("Should reject addFile when same url", async function () {
@@ -944,8 +915,7 @@ describe("DataLiquidityPool", () => {
       validator1.ownerAddress.should.eq(v1Owner.address);
       validator1.stakeAmount.should.eq(parseEther('100'));
       validator1.status.should.eq(ValidatorStatus.Registered);
-      validator1.filesToVerifyIndex.should.eq(0);
-      validator1.filesToVerifyCount.should.eq(0);
+      validator1.lastVerifiedFile.should.eq(0);
       validator1.grantedAmount.should.eq(0);
       validator1.firstBlockNumber.should.eq(0);
       validator1.lastBlockNumber.should.eq(0);
@@ -954,8 +924,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.validators(1)).should.deep.eq(validator1);
 
       (await dlp.activeValidatorsListsCount()).should.eq(0);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
@@ -978,8 +946,7 @@ describe("DataLiquidityPool", () => {
       validator1.ownerAddress.should.eq(v1Owner.address);
       validator1.stakeAmount.should.eq(parseEther('100'));
       validator1.status.should.eq(ValidatorStatus.Registered);
-      validator1.filesToVerifyIndex.should.eq(0);
-      validator1.filesToVerifyCount.should.eq(0);
+      validator1.lastVerifiedFile.should.eq(0);
       validator1.grantedAmount.should.eq(0);
       validator1.firstBlockNumber.should.eq(0);
       validator1.lastBlockNumber.should.eq(0);
@@ -988,8 +955,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.validators(1)).should.deep.eq(validator1);
 
       (await dlp.activeValidatorsListsCount()).should.eq(0);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
@@ -1013,8 +978,7 @@ describe("DataLiquidityPool", () => {
       validator1.ownerAddress.should.eq(v1Owner.address);
       validator1.stakeAmount.should.eq(parseEther('100'));
       validator1.status.should.eq(ValidatorStatus.Registered);
-      validator1.filesToVerifyIndex.should.eq(0);
-      validator1.filesToVerifyCount.should.eq(0);
+      validator1.lastVerifiedFile.should.eq(0);
       validator1.grantedAmount.should.eq(parseEther('100'));
       validator1.firstBlockNumber.should.eq(0);
       validator1.lastBlockNumber.should.eq(0);
@@ -1023,8 +987,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.validators(1)).should.deep.eq(validator1);
 
       (await dlp.activeValidatorsListsCount()).should.eq(0);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
@@ -1054,8 +1016,7 @@ describe("DataLiquidityPool", () => {
       validator1.ownerAddress.should.eq(v1Owner.address);
       validator1.stakeAmount.should.eq(parseEther('100'));
       validator1.status.should.eq(ValidatorStatus.Registered);
-      validator1.filesToVerifyIndex.should.eq(0);
-      validator1.filesToVerifyCount.should.eq(0);
+      validator1.lastVerifiedFile.should.eq(0);
       validator1.grantedAmount.should.eq(0);
       validator1.firstBlockNumber.should.eq(0);
       validator1.lastBlockNumber.should.eq(0);
@@ -1065,8 +1026,7 @@ describe("DataLiquidityPool", () => {
       validator2.ownerAddress.should.eq(v2Owner.address);
       validator2.stakeAmount.should.eq(parseEther('200'));
       validator2.status.should.eq(ValidatorStatus.Registered);
-      validator2.filesToVerifyIndex.should.eq(0);
-      validator2.filesToVerifyCount.should.eq(0);
+      validator2.lastVerifiedFile.should.eq(0);
       validator2.grantedAmount.should.eq(0);
       validator2.firstBlockNumber.should.eq(0);
       validator2.lastBlockNumber.should.eq(0);
@@ -1076,8 +1036,7 @@ describe("DataLiquidityPool", () => {
       validator3.ownerAddress.should.eq(v3Owner.address);
       validator3.stakeAmount.should.eq(parseEther('300'));
       validator3.status.should.eq(ValidatorStatus.Registered);
-      validator3.filesToVerifyIndex.should.eq(0);
-      validator3.filesToVerifyCount.should.eq(0);
+      validator3.lastVerifiedFile.should.eq(0);
       validator3.grantedAmount.should.eq(0);
       validator3.firstBlockNumber.should.eq(0);
       validator3.lastBlockNumber.should.eq(0);
@@ -1088,8 +1047,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.validators(3)).should.deep.eq(validator3);
 
       (await dlp.activeValidatorsListsCount()).should.eq(0);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
 
       (await dlp.totalStaked()).should.eq(parseEther('100') + parseEther('200') + parseEther('300'));
 
@@ -1167,8 +1124,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.activeValidatorsListsCount()).should.eq(1);
       (await await dlp.activeValidatorsLists(1)).should.deep.eq([v1.address]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
-
       (await dlp.epochs(1)).validatorsListId.should.eq(1);
     });
 
@@ -1230,8 +1185,6 @@ describe("DataLiquidityPool", () => {
       (await dlp.activeValidatorsLists(1)).should.deep.eq([v1.address]);
       (await dlp.activeValidatorsLists(2)).should.deep.eq([v1.address, v2.address]);
       (await dlp.activeValidatorsLists(3)).should.deep.eq([v1.address, v2.address, v3.address]);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
 
       (await dlp.epochs(1)).validatorsListId.should.eq(3);
     });
@@ -1390,8 +1343,6 @@ describe("DataLiquidityPool", () => {
 
       const epoch5 = await dlp.epochs(5);
       epoch5.validatorsListId.should.eq(3);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
     });
 
     it("should deregisterValidator when validator owner", async function () {
@@ -1403,8 +1354,6 @@ describe("DataLiquidityPool", () => {
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address)
@@ -1425,8 +1374,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(0);
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
@@ -1443,8 +1390,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address);
@@ -1465,8 +1410,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
@@ -1478,8 +1421,6 @@ describe("DataLiquidityPool", () => {
       await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(owner).deregisterValidator(v1)
         .should.be.rejectedWith('NotValidatorOwner');
@@ -1510,8 +1451,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
-
       const currentBlockNumber = await getCurrentBlockNumber();
 
       await dlp.connect(v1Owner).deregisterValidator(v1)
@@ -1557,8 +1496,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
       (await activeValidatorsList4).should.deep.eq([v2.address, v3.address]);
 
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v2.address, v3.address].sort());
-
       (await dlp.totalStaked()).should.eq(4n * parseEther('100'));
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
@@ -1567,8 +1504,6 @@ describe("DataLiquidityPool", () => {
 
     it("should deregisterValidator when validator owner #multiple validators 2", async function () {
       await registerValidators();
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
 
       const currentBlockNumber = await getCurrentBlockNumber();
 
@@ -1614,40 +1549,6 @@ describe("DataLiquidityPool", () => {
 
       const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
       (await activeValidatorsList4).should.deep.eq([v1.address, v3.address]);
-
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v1.address, v3.address].sort());
-    });
-
-    it("should deregisterValidator and keep the validator in the assignedValidators list", async function () {
-      await registerValidators();
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
-
-      await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
-      await dlp.connect(user2).addFile('file2URL', "file2EncryptedAddress");
-      await dlp.connect(user3).addFile('file3URL', "file3EncryptedAddress");
-
-      (await dlp.getNextFileToVerify(v2)).fileId.should.eq(1);
-
-      const currentBlockNumber = await getCurrentBlockNumber();
-
-      await dlp.connect(v2Owner).deregisterValidator(v2)
-        .should.emit(dlp, 'ValidatorDeregistered')
-        .withArgs(v2.address);
-
-      const validator2 = await dlp.validatorsInfo(v2);
-      validator2.status.should.eq(ValidatorStatus.Deregistered);
-      validator2.lastBlockNumber.should.eq(currentBlockNumber + 1);
-
-      (await dlp.validatorsCount()).should.eq(5);
-      (await dlp.validators(2)).should.deep.eq(validator2);
-
-      (await dlp.activeValidatorsListsCount()).should.eq(4);
-
-      const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
-      (await activeValidatorsList4).should.deep.eq([v1.address, v3.address]);
-
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address].sort());
     });
 
     it("should deregisterValidatorByOwner when dlp owner", async function () {
@@ -1659,8 +1560,6 @@ describe("DataLiquidityPool", () => {
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('100')).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address)
@@ -1682,8 +1581,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(0);
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
@@ -1700,8 +1597,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('100')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('100'), parseEther('0'))
@@ -1723,8 +1618,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
@@ -1742,8 +1635,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('40')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('40'), parseEther('60'))
@@ -1765,8 +1656,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
@@ -1784,8 +1673,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('0')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('0'), parseEther('100'))
@@ -1807,8 +1694,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance);
@@ -1826,8 +1711,6 @@ describe("DataLiquidityPool", () => {
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address);
@@ -1851,8 +1734,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList2 = await dlp.activeValidatorsLists(2);
       (await activeValidatorsList2).should.deep.eq([]);
 
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress]);
-
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
       (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
@@ -1865,8 +1746,6 @@ describe("DataLiquidityPool", () => {
       await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address]);
 
       await dlp.connect(v1Owner).deregisterValidatorByOwner(v1, parseEther('100'))
         .should.be.rejectedWith(`OwnableUnauthorizedAccount("${v1Owner.address}")`);
@@ -1896,8 +1775,6 @@ describe("DataLiquidityPool", () => {
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
       (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
 
       const currentBlockNumber = await getCurrentBlockNumber();
 
@@ -1944,8 +1821,6 @@ describe("DataLiquidityPool", () => {
       const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
       (await activeValidatorsList4).should.deep.eq([v2.address, v3.address]);
 
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v2.address, v3.address].sort());
-
       (await dlp.totalStaked()).should.eq(4n * parseEther('100'));
 
       (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
@@ -1954,8 +1829,6 @@ describe("DataLiquidityPool", () => {
 
     it("should deregisterValidatorByOwner when validator owner #multiple validators 2", async function () {
       await registerValidators();
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
 
       const currentBlockNumber = await getCurrentBlockNumber();
 
@@ -2001,40 +1874,6 @@ describe("DataLiquidityPool", () => {
 
       const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
       (await activeValidatorsList4).should.deep.eq([v1.address, v3.address]);
-
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v1.address, v3.address].sort());
-    });
-
-    it("should deregisterValidatorByOwner and keep the validator in the assignedValidators list", async function () {
-      await registerValidators();
-
-      (await dlp.assignedValidators()).should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address]);
-
-      await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
-      await dlp.connect(user2).addFile('file2URL', "file2EncryptedAddress");
-      await dlp.connect(user3).addFile('file3URL', "file3EncryptedAddress");
-
-      (await dlp.getNextFileToVerify(v2)).fileId.should.eq(1);
-
-      const currentBlockNumber = await getCurrentBlockNumber();
-
-      await dlp.connect(owner).deregisterValidatorByOwner(v2, parseEther('100'))
-        .should.emit(dlp, 'ValidatorDeregistered')
-        .withArgs(v2.address);
-
-      const validator2 = await dlp.validatorsInfo(v2);
-      validator2.status.should.eq(ValidatorStatus.Deregistered);
-      validator2.lastBlockNumber.should.eq(currentBlockNumber + 1);
-
-      (await dlp.validatorsCount()).should.eq(5);
-      (await dlp.validators(2)).should.deep.eq(validator2);
-
-      (await dlp.activeValidatorsListsCount()).should.eq(4);
-
-      const activeValidatorsList4 = await dlp.activeValidatorsLists(4);
-      (await activeValidatorsList4).should.deep.eq([v1.address, v3.address]);
-
-      Array.from(await dlp.assignedValidators()).sort().should.deep.eq([ethers.ZeroAddress, v1.address, v2.address, v3.address].sort());
     });
   });
 
@@ -2043,26 +1882,108 @@ describe("DataLiquidityPool", () => {
       await deploy();
     });
 
-    it("should verifyFile when  validator", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
-      await dlp.connect(owner).approveValidator(v1);
+    it("should verifyFile when validator", async function () {
+      await registerValidator1();
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
 
-      const nextFile = await dlp.getNextFileToVerify(v1);
-
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata')
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'))
         .should.emit(dlp, 'FileVerified')
         .withArgs(v1.address, 1, parseEther('0.6'));
 
       const file1 = await dlp.files(1);
       file1.verificationsCount.should.eq(1);
       file1.reward.should.eq(parseEther('0.6') * fileRewardFactor / parseEther('1'));
+      file1.valid.should.eq(true);
+      file1.score.should.eq(parseEther('0.6'));
+      file1.authenticity.should.eq(parseEther('0.6'));
+      file1.ownership.should.eq(parseEther('0.6'));
+      file1.quality.should.eq(parseEther('0.6'));
+      file1.uniqueness.should.eq(parseEther('0.6'));
 
-      const fileVerification = await dlp.fileVerifications(1, 0);
-      fileVerification.score.should.eq(parseEther('0.6'));
-      fileVerification.metadata.should.eq('file metadata');
+      const fileScore = await dlp.fileScores(1, v1);
+      fileScore.valid.should.eq(true);
+      fileScore.score.should.eq(parseEther('0.6'));
+      fileScore.reportedAtBlock.should.eq(await getCurrentBlockNumber());
+      fileScore.authenticity.should.eq(parseEther('0.6'));
+      fileScore.ownership.should.eq(parseEther('0.6'));
+      fileScore.quality.should.eq(parseEther('0.6'));
+      fileScore.uniqueness.should.eq(parseEther('0.6'));
+    });
+
+    it("should get next unverified file for validator", async function () {
+      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
+      await dlp.connect(owner).approveValidator(v1);
+
+      // Add multiple files
+      await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
+      await dlp.connect(user1).addFile('file2URL', "file2EncryptedAddress");
+      await dlp.connect(user1).addFile('file3URL', "file3EncryptedAddress");
+
+      // Verify the first file
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'), parseEther('0.5'), parseEther('0.7'), parseEther('0.8'), parseEther('0.4'));
+
+      // Get next file to verify
+      let nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(2);
+
+      // Verify the second file
+      await dlp.connect(v1).verifyFile(2, true, parseEther('0.7'), parseEther('0.6'), parseEther('0.8'), parseEther('0.9'), parseEther('0.5'));
+
+      // Get next file to verify
+      nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(3);
+
+      // Verify the third file
+      await dlp.connect(v1).verifyFile(3, true, parseEther('0.8'), parseEther('0.7'), parseEther('0.9'), parseEther('1.0'), parseEther('0.6'));
+
+      // Get next file to verify when all files are verified
+      nextFile = await dlp.getNextFileToVerify(v1.address);
+      nextFile.fileId.should.eq(0); // Should return 0 when no more files to verify
+    });
+
+    it("should verifyFile by multiple validators", async function () {
+      await registerValidators();
+
+      await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
+
+      const blockNumber = await getCurrentBlockNumber();
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'))
+        .should.emit(dlp, 'FileVerified')
+        .withArgs(v1.address, 1, parseEther('0.6'));
+
+      await dlp.connect(v2).verifyFile(1, false, parseEther('0.8'),  parseEther('0.8'), parseEther('0.8'), parseEther('0.8'), parseEther('0.8'))
+        .should.emit(dlp, 'FileVerified')
+        .withArgs(v2.address, 1, parseEther('0.8'));
+
+      const file1 = await dlp.files(1);
+      file1.verificationsCount.should.eq(2);
+      file1.reward.should.eq(parseEther('0.7') * fileRewardFactor / parseEther('1'));
+      file1.valid.should.eq(false);
+      file1.score.should.eq(parseEther('0.7'));
+      file1.authenticity.should.eq(parseEther('0.7'));
+      file1.ownership.should.eq(parseEther('0.7'));
+      file1.quality.should.eq(parseEther('0.7'));
+      file1.uniqueness.should.eq(parseEther('0.7'));
+
+      const fileScore1 = await dlp.fileScores(1, v1);
+      fileScore1.valid.should.eq(true);
+      fileScore1.score.should.eq(parseEther('0.6'));
+      fileScore1.reportedAtBlock.should.eq(blockNumber + 1);
+      fileScore1.authenticity.should.eq(parseEther('0.6'));
+      fileScore1.ownership.should.eq(parseEther('0.6'));
+      fileScore1.quality.should.eq(parseEther('0.6'));
+      fileScore1.uniqueness.should.eq(parseEther('0.6'));
+
+      const fileScore2 = await dlp.fileScores(1, v2);
+      fileScore2.valid.should.eq(false);
+      fileScore2.score.should.eq(parseEther('0.8'));
+      fileScore2.reportedAtBlock.should.eq(blockNumber + 2);
+      fileScore2.authenticity.should.eq(parseEther('0.8'));
+      fileScore2.ownership.should.eq(parseEther('0.8'));
+      fileScore2.quality.should.eq(parseEther('0.8'));
+      fileScore2.uniqueness.should.eq(parseEther('0.8'));
     });
 
     it("should updateWeights when validator", async function () {
@@ -2172,7 +2093,7 @@ describe("DataLiquidityPool", () => {
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
 
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata');
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'));
 
       await dlp.connect(user2).claimContributionReward(1).should.be.rejectedWith(`NotFileOwner()`);
     });
@@ -2184,7 +2105,7 @@ describe("DataLiquidityPool", () => {
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
 
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata');
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'));
 
       await dlp.connect(user1).claimContributionReward(2).should.be.rejectedWith(`NotFileOwner()`);
     });
@@ -2196,7 +2117,7 @@ describe("DataLiquidityPool", () => {
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
 
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata');
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'));
 
       await dlp.connect(user1).claimContributionReward(1).should.be.rejectedWith(`WithdrawNotAllowed()`);
     });
@@ -2209,7 +2130,7 @@ describe("DataLiquidityPool", () => {
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
 
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata');
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'));
 
       await advanceNSeconds(fileRewardDelay);
 
@@ -2228,8 +2149,7 @@ describe("DataLiquidityPool", () => {
       await dlp.connect(owner).approveValidator(v1);
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
-
-      await dlp.connect(v1).verifyFile(1, parseEther('0.6'), 'file metadata');
+      await dlp.connect(v1).verifyFile(1, true, parseEther('0.6'),  parseEther('0.6'), parseEther('0.6'), parseEther('0.6'), parseEther('0.6'));
 
       await advanceNSeconds(fileRewardDelay);
 
