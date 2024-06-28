@@ -1,7 +1,7 @@
 ## Deploy your own DLP, DLP Root, and Token smart contracts on Satori
 
 1. Install hardhat: https://hardhat.org/hardhat-runner/docs/getting-started#installation
-2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/dlp-smart-contracts
+2. Clone the DLP Smart Contract Repo: https://github.com/vana-com/vana-dlp-smart-contracts/
 3. Install dependencies
 
 ```bash
@@ -55,7 +55,7 @@ npx hardhat verify --network satori <data_liquidity_pool_token_address> "<token_
 
 If you get an error, it may be because the block explorer has already verified matching bytecode. Check your contract in the block explorer. If it is verified, you can ignore the error.
 
-10. Congratulations, you've deployed the DLP Root, DLP, and token smart contracts. You can confirm they are up by searching the addresses on the block explorer: https://satori.vanascan.org/address/<contract_address>.
+10. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/address/<contract_address>. .
 
 11. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlp-upgrade.ts` script:
 
