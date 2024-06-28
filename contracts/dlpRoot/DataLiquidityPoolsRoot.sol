@@ -64,7 +64,7 @@ contract DataLiquidityPoolsRoot is
      *
      * @param dlpAddress                   address of the dlp
      */
-    event DlpUnregisterd(address indexed dlpAddress);
+    event DlpUnregistered(address indexed dlpAddress);
 
     /**
      * @notice Triggered when a dlp has been approved
