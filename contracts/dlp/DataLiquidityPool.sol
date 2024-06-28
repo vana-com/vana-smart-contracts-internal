@@ -33,11 +33,8 @@ contract DataLiquidityPool is
      * @param amount                             amount staked in this call
      * @param totalAmount                        total amount staked by the validator
      */
-    event Staked(
-        address indexed validatorAddress,
-        uint256 amount,
-        uint256 totalAmount
-    );
+    event Staked(address indexed validatorAddress, uint256 amount, uint256 totalAmount);
+
     /**
      * @notice Triggered when a validator has unstaked some DAT
      *
@@ -53,18 +50,14 @@ contract DataLiquidityPool is
      * @param ownerAddress                       owner of the validator
      * @param amount                             amount staked in this call
      */
-    event ValidatorRegistered(
-        address indexed validatorAddress,
-        address indexed ownerAddress,
-        uint256 amount
-    );
+    event ValidatorRegistered(address indexed validatorAddress, address indexed ownerAddress, uint256 amount);
 
     /**
      * @notice Triggered when a validator has been unregistered
      *
      * @param validatorAddress                   address of the validator
      */
-    event ValidatorUnregisterd(address indexed validatorAddress);
+    event ValidatorUnregistered(address indexed validatorAddress);
 
     /**
      * @notice Triggered when a validator has been approved
@@ -74,18 +67,20 @@ contract DataLiquidityPool is
     event ValidatorApproved(address indexed validatorAddress);
 
     /**
-     * @notice Triggered when a validator has been inactivated
-     *
-     * @param validatorAddress                   address of the validator
-     */
-    event ValidatorInactivated(address indexed validatorAddress);
-
-    /**
      * @notice Triggered when a validator has been deregistered
      *
      * @param validatorAddress                   address of the validator
      */
     event ValidatorDeregistered(address indexed validatorAddress);
+
+    /**
+     * @notice Triggered when a validator has been deregistered by the dlp owner
+     *
+     * @param validatorAddress                   address of the validator
+     * @param unstakedAmount                    amount unstaked
+     * @param penaltyAmount                      penalty amount
+     */
+    event ValidatorDeregisteredByOwner(address indexed validatorAddress, uint256 unstakedAmount, uint256 penaltyAmount);
 
     /**
      * @notice Triggered when a master key has been set
@@ -109,11 +104,7 @@ contract DataLiquidityPool is
      * @param fileId                             file id
      * @param score                              score of the verification
      */
-    event FileVerified(
-        address indexed validatorAddress,
-        uint256 fileId,
-        uint256 score
-    );
+    event FileVerified(address indexed validatorAddress, uint256 fileId, uint256 score);
 
     /**
      * @notice Triggered when a epoch has been created
@@ -129,11 +120,7 @@ contract DataLiquidityPool is
      * @param validators                         validators
      * @param weights                            weights
      */
-    event WeightsUpdated(
-        address indexed validatorAddress,
-        address[] validators,
-        uint256[] weights
-    );
+    event WeightsUpdated(address indexed validatorAddress, address[] validators, uint256[] weights);
 
     /**
      * @notice Triggered when the max number of validators has been updated
@@ -206,20 +193,25 @@ contract DataLiquidityPool is
     event FileRewardFactorUpdated(uint256 newFileRewardFactor);
 
     /**
-    * @notice Triggered when a data contributor has claimed a reward
-    *
-    * @param contributorAddress                 address of the contributor
-    * @param fileId                             file id
-    * @param amount                             amount claimed
+     * @notice Triggered when a data contributor has claimed a reward
+     *
+     * @param contributorAddress                 address of the contributor
+     * @param fileId                             file id
+     * @param amount                             amount claimed
      */
-    event ContributionRewardClaimed(
-        address indexed contributorAddress,
-        uint256 fileId,
-        uint256 amount
-    );
+    event ContributionRewardClaimed(address indexed contributorAddress, uint256 fileId, uint256 amount);
+
+    /**
+     * @notice Triggered when a validator has claimed un unsed reward
+     *
+     * @param validator                           address of the validator
+     * @param epochId                             epcoch id
+     * @param claimAmount                         amount claimed
+     */
+    event EpochRewardClaimed(address validator, uint256 epochId, uint256 claimAmount);
 
     error InvalidStakeAmount();
-    error InvalidValidatorStatus(uint256 reuired, uint256 current);
+    error InvalidValidatorStatus();
     error TooManyValidators();
     error NotValidatorOwner();
     error WithdrawNotAllowed();
@@ -229,22 +221,22 @@ contract DataLiquidityPool is
     error InvalidFileId();
     error ArityMismatch();
     error NotFileOwner();
+    error NotAllowed();
+    error NothingToClaim();
+    error NotFinalized();
 
     /**
      * @dev Modifier to make a function callable only when the caller is an active validator
      */
     modifier onlyActiveValidators() {
         if (_validatorsInfo[msg.sender].status != ValidatorStatus.Active) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Active),
-                uint256(_validatorsInfo[msg.sender].status)
-            );
+            revert InvalidValidatorStatus();
         }
         _;
     }
 
     /**
-     * @dev Modifier to make a function callable only when the caller is the cold key of the validator
+     * @dev Modifier to make a function callable only when the caller is the owner of the validator
      *
      * @param validatorAddress                         address of the validator
      */
@@ -255,66 +247,58 @@ contract DataLiquidityPool is
         _;
     }
 
+    struct InitParams {
+        string name;
+        address ownerAddress;
+        address tokenAddress;
+        uint256 newMaxNumberOfValidators;
+        uint256 newValidatorScoreMinTrust;
+        uint256 newValidatorScoreKappa;
+        uint256 newValidatorScoreRho;
+        uint256 newValidationPeriod;
+        uint256 newMinStakeAmount;
+        uint256 startBlock;
+        uint256 newEpochSize;
+        uint256 newEpochRewardAmount;
+        uint256 newFileRewardFactor;
+        uint256 newFileRewardDelay;
+    }
+
     /**
      * @notice Initialize the contract
      *
-     * @param ownerAddress                       owner of the contract
-     * @param newMaxNumberOfValidators           maximum number of validators
-     * @param newValidatorScoreMinTrust          minimum trust score
-     * @param newValidatorScoreKappa             trust score kappa
-     * @param newValidatorScoreRho               trust score rho
-     * @param newValidationPeriod                validation period
-     * @param newMinStakeAmount                  minimum stake amount
-     * @param startBlock                         start block
-     * @param newEpochSize                       epoch size size
-     * @param newEpochRewardAmount               reward amount
-     * @param newFileRewardDelay                 file reward delay
-
+     * @param params                             initialization parameters
      */
-    function initialize(
-        address ownerAddress,
-        address tokenAddress,
-        uint256 newMaxNumberOfValidators,
-        uint256 newValidatorScoreMinTrust,
-        uint256 newValidatorScoreKappa,
-        uint256 newValidatorScoreRho,
-        uint256 newValidationPeriod,
-        uint256 newMinStakeAmount,
-        uint256 startBlock,
-        uint256 newEpochSize,
-        uint256 newEpochRewardAmount,
-        uint256 newFileRewardFactor,
-        uint256 newFileRewardDelay
-    ) external initializer {
+    function initialize(InitParams memory params) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
+        __AccessControl_init();
 
-        maxNumberOfValidators = newMaxNumberOfValidators;
-        validatorScoreMinTrust = newValidatorScoreMinTrust;
-        validatorScoreKappa = newValidatorScoreKappa;
-        validatorScoreRho = newValidatorScoreRho;
-        minStakeAmount = newMinStakeAmount;
-        validationPeriod = newValidationPeriod;
-        epochSize = newEpochSize;
-        epochRewardAmount = newEpochRewardAmount;
-        token = IERC20(tokenAddress);
-        fileRewardFactor = newFileRewardFactor;
-        fileRewardDelay = newFileRewardDelay;
+        name = params.name;
+        maxNumberOfValidators = params.newMaxNumberOfValidators;
+        validatorScoreMinTrust = params.newValidatorScoreMinTrust;
+        validatorScoreKappa = params.newValidatorScoreKappa;
+        validatorScoreRho = params.newValidatorScoreRho;
+        minStakeAmount = params.newMinStakeAmount;
+        validationPeriod = params.newValidationPeriod;
+        epochSize = params.newEpochSize;
+        epochRewardAmount = params.newEpochRewardAmount;
+        token = IERC20(params.tokenAddress);
+        fileRewardFactor = params.newFileRewardFactor;
+        fileRewardDelay = params.newFileRewardDelay;
 
         epochsCount = 1;
 
-        _validatorsWithFilesToVerify.add(address(0));
-
         Epoch storage firstEpoch = _epochs[1];
-        firstEpoch.startBlock = startBlock;
-        firstEpoch.endBlock = startBlock + newEpochSize - 1;
-        firstEpoch.reward = newEpochRewardAmount;
+        firstEpoch.startBlock = params.startBlock;
+        firstEpoch.endBlock = params.startBlock + params.newEpochSize - 1;
+        firstEpoch.reward = params.newEpochRewardAmount;
 
         emit EpochCreated(1);
 
-        _transferOwnership(ownerAddress);
+        _transferOwnership(params.ownerAddress);
     }
 
     /**
@@ -323,23 +307,20 @@ contract DataLiquidityPool is
      *
      * @param newImplementation                  new implementation
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
      * return the veriosn of the contract
      */
-    function version() external pure returns (uint256) {
+    function version() external pure override returns (uint256) {
         return 1;
     }
 
     /**
      * @notice Get the number of files
      */
-    function filesCount() external view returns (uint256) {
-        // TODO: fix spelling
-        return _fileUrlHases.length();
+    function filesCount() external view override returns (uint256) {
+        return _fileUrlHashes.length();
     }
 
     /**
@@ -347,39 +328,36 @@ contract DataLiquidityPool is
      *
      * @param fileId                              file id
      */
-    function files(
-        uint256 fileId
-    ) public view override returns (FileResponse memory) {
-        return FileResponse(
-            fileId,
-            _files[fileId].contributorAddress,
-            _files[fileId].url,
-            _files[fileId].encryptedKey,
-            _files[fileId].addedTimestamp,
-            _files[fileId].reward,
-            _files[fileId].rewardWithdrawn,
-            _files[fileId].verificationsCount
-        );
+    function files(uint256 fileId) public view override returns (FileResponse memory) {
+        File storage file = _files[fileId];
+        return FileResponse({
+            fileId: fileId,
+            ownerAddress: file.ownerAddress,
+            url: file.url,
+            encryptedKey: file.encryptedKey,
+            addedTimestamp: file.addedTimestamp,
+            addedAtBlock: file.addedAtBlock,
+            valid: file.valid,
+            finalized: file.finalized,
+            score: file.score,
+            authenticity: file.authenticity,
+            ownership: file.ownership,
+            quality: file.quality,
+            uniqueness: file.uniqueness,
+            reward: file.reward,
+            rewardWithdrawn: file.rewardWithdrawn,
+            verificationsCount: file.verificationsCount
+        });
     }
 
     /**
-     * @notice Get the file verifications
+     * @notice Get the file scores for a validator
      *
-     * @param fileId                              file id
-     * @param verificationId                      verification id
+     * @param fileId                   file id
+     * @param validatorAddress         validator address
      */
-    function fileVerifications(
-        uint256 fileId,
-        uint256 verificationId
-    )
-        external
-        view
-        override
-        returns (
-            FileVerificationInfo memory
-        )
-    {
-        return _files[fileId].verifications[verificationId];
+    function fileScores(uint256 fileId, address validatorAddress) external view override returns (FileScore memory) {
+        return _files[fileId].scores[validatorAddress];
     }
 
     /**
@@ -388,9 +366,7 @@ contract DataLiquidityPool is
      * @param index                   index of the contributor
      * @return ContributorInfoResponse             contributor information
      */
-    function contributors(
-        uint256 index
-    ) external view returns (ContributorInfoResponse memory) {
+    function contributors(uint256 index) external view override returns (ContributorInfoResponse memory) {
         return contributorInfo(_contributors[index]);
     }
 
@@ -400,14 +376,11 @@ contract DataLiquidityPool is
      * @param contributorAddress                   address of the contributor
      * @return ContributorInfoResponse             contributor information
      */
-    function contributorInfo(
-        address contributorAddress
-    ) public view returns (ContributorInfoResponse memory) {
-        return
-            ContributorInfoResponse(
-                contributorAddress,
-                _contributorInfo[contributorAddress].fileIdsCount
-            );
+    function contributorInfo(address contributorAddress) public view override returns (ContributorInfoResponse memory) {
+        return ContributorInfoResponse({
+            contributorAddress: contributorAddress,
+            fileIdsCount: _contributorInfo[contributorAddress].fileIdsCount
+        });
     }
 
     /**
@@ -417,10 +390,7 @@ contract DataLiquidityPool is
      * @param index                                index of the file
      * @return uint256                             file id
      */
-    function contributorFiles(
-        address contributorAddress,
-        uint256 index
-    ) external view returns (FileResponse memory) {
+    function contributorFiles(address contributorAddress, uint256 index) external view override returns (FileResponse memory) {
         return files(_contributorInfo[contributorAddress].fileIds[index]);
     }
 
@@ -429,9 +399,7 @@ contract DataLiquidityPool is
      *
      * @param index                         index of the validator
      */
-    function validators(
-        uint256 index
-    ) external view override returns (ValidatorInfoResponse memory) {
+    function validators(uint256 index) external view override returns (ValidatorInfoResponse memory) {
         return validatorsInfo(_validators[index]);
     }
 
@@ -440,29 +408,18 @@ contract DataLiquidityPool is
      *
      * @param validatorAddress                         address of the validator
      */
-    function validatorsInfo(
-        address validatorAddress
-    ) public view override returns (ValidatorInfoResponse memory) {
-        return
-            ValidatorInfoResponse(
-                validatorAddress,
-                _validatorsInfo[validatorAddress].ownerAddress,
-                _validatorsInfo[validatorAddress].stakeAmount,
-                _validatorsInfo[validatorAddress].status,
-                _validatorsInfo[validatorAddress].firstBlockNumber,
-                _validatorsInfo[validatorAddress].lastBlockNumber,
-                _validatorsInfo[validatorAddress].grantedAmount,
-                _validatorsInfo[validatorAddress].filesToVerifyIndex,
-                _validatorsInfo[validatorAddress].filesToVerifyCount
-            );
-    }
-
-    function validatorsWithFilesToVerify()
-        external
-        view
-        returns (address[] memory)
-    {
-        return _validatorsWithFilesToVerify.values();
+    function validatorsInfo(address validatorAddress) public view override returns (ValidatorInfoResponse memory) {
+        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
+        return ValidatorInfoResponse({
+            validatorAddress: validatorAddress,
+            ownerAddress: validator.ownerAddress,
+            stakeAmount: validator.stakeAmount,
+            status: validator.status,
+            firstBlockNumber: validator.firstBlockNumber,
+            lastBlockNumber: validator.lastBlockNumber,
+            grantedAmount: validator.grantedAmount,
+            lastVerifiedFile: validator.lastVerifiedFile
+        });
     }
 
     /**
@@ -470,76 +427,15 @@ contract DataLiquidityPool is
      *
      * @param validatorAddress                   address of the validator
      */
-    function getNextFileToVerify(
-        address validatorAddress
-    ) public view override returns (NextFileToVerify memory) {
+    function getNextFileToVerify(address validatorAddress) public view override returns (FileResponse memory) {
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
         if (validator.status != ValidatorStatus.Active) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Active),
-                uint256(validator.status)
-            );
+            revert InvalidValidatorStatus();
         }
 
-        uint256 nextFileId = validator.filesToVerify[
-            validator.filesToVerifyIndex + 1
-        ];
+        uint256 nextFileId = Math.max(validator.lastVerifiedFile, lastFinalizedFileId) + 1;
 
-        File storage file = _files[nextFileId];
-
-        if (
-            nextFileId > 0 &&
-            file.addedTimestamp + validationPeriod < block.timestamp
-        ) {
-            return
-                NextFileToVerify(
-                    nextFileId,
-                    file.url,
-                    file.encryptedKey,
-                    file.addedTimestamp,
-                    validatorAddress
-                );
-        }
-
-        address assignedValidator = validatorAddress;
-
-        uint256 validatorsWithFilesToVerifyCount = _validatorsWithFilesToVerify
-            .length();
-
-        File storage otherValidatorFile;
-        for (
-            uint256 index = 0;
-            index < validatorsWithFilesToVerifyCount;
-            index++
-        ) {
-            validator = _validatorsInfo[_validatorsWithFilesToVerify.at(index)];
-
-            uint256 otherValidatorNextFileId = validator.filesToVerify[
-                validator.filesToVerifyIndex + 1
-            ];
-
-            otherValidatorFile = _files[otherValidatorNextFileId];
-
-            if (
-                otherValidatorNextFileId > 0 &&
-                otherValidatorFile.addedTimestamp + validationPeriod <
-                block.timestamp &&
-                otherValidatorFile.addedTimestamp < file.addedTimestamp
-            ) {
-                nextFileId = otherValidatorNextFileId;
-                file = otherValidatorFile;
-                assignedValidator = _validatorsWithFilesToVerify.at(index);
-            }
-        }
-
-        return
-            NextFileToVerify(
-                nextFileId,
-                file.url,
-                file.encryptedKey,
-                file.addedTimestamp,
-                assignedValidator
-            );
+        return files(nextFileId > _fileUrlHashes.length() ? 0 : nextFileId);
     }
 
     /**
@@ -547,32 +443,20 @@ contract DataLiquidityPool is
      *
      * @param epochId                         epoch id
      */
-    function epochs(
-        uint256 epochId
-    )
-        external
-        view
-        returns (
-            uint256 startBlock,
-            uint256 endBlock,
-            uint256 reward,
-            uint256 validatorsListId
-        )
-    {
-        return (
-            _epochs[epochId].startBlock,
-            _epochs[epochId].endBlock,
-            _epochs[epochId].reward,
-            _epochs[epochId].validatorsListId
-        );
+    function epochs(uint256 epochId) external view override returns (EpochResponse memory) {
+        Epoch storage epoch = _epochs[epochId];
+        return EpochResponse({
+            startBlock: epoch.startBlock,
+            endBlock: epoch.endBlock,
+            reward: epoch.reward,
+            validatorsListId: epoch.validatorsListId
+        });
     }
 
     /**
      * @notice Get active validator list by listId
      */
-    function activeValidatorsLists(
-        uint256 id
-    ) public view override returns (address[] memory) {
+    function activeValidatorsLists(uint256 id) public view override returns (address[] memory) {
         return _activeValidatorsLists[id].values();
     }
 
@@ -582,58 +466,37 @@ contract DataLiquidityPool is
      * @param epochId                              epoch id
      *
      * @return validators                          validators
-     * @return shares                              rewards
+     * @return scores                               scores
+     * @return withdrawnAmounts                    withdrawnAmounts
      */
-    function epochRewards(
-        uint256 epochId
-    )
-        external
-        view
-        returns (
-            address[] memory validators,
-            uint256[] memory shares,
-            uint256[] memory withdrawnAmounts
-        )
-    {
-        EnumerableSet.AddressSet
-            storage epochValidators = _activeValidatorsLists[
-                _epochs[epochId].validatorsListId
-            ];
-
+    function epochRewards(uint256 epochId) external view override returns (
+        address[] memory validators,
+        uint256[] memory scores,
+        uint256[] memory withdrawnAmounts
+    ) {
+        EnumerableSet.AddressSet storage epochValidators = _activeValidatorsLists[_epochs[epochId].validatorsListId];
         uint256 epochValidatorsCount = epochValidators.length();
 
         validators = new address[](epochValidatorsCount);
-        shares = new uint256[](epochValidatorsCount);
+        scores = new uint256[](epochValidatorsCount);
         withdrawnAmounts = new uint256[](epochValidatorsCount);
 
         Epoch storage epoch = _epochs[epochId];
 
         for (uint256 i = 0; i < epochValidatorsCount; i++) {
             validators[i] = epochValidators.at(i);
-            shares[i] = epoch.validatorRewards[validators[i]].share;
-            withdrawnAmounts[i] = epoch
-                .validatorRewards[validators[i]]
-                .withdrawnAmount;
+            scores[i] = epoch.validatorRewards[validators[i]].score;
+            withdrawnAmounts[i] = epoch.validatorRewards[validators[i]].withdrawnAmount;
         }
     }
 
     /**
      * @notice Get weights assigned by the validator
      */
-    function validatorWeights(
-        address validatorAddress
-    )
-        external
-        view
-        returns (address[] memory validators, uint256[] memory weights)
-    {
+    function validatorWeights(address validatorAddress) external view override returns (address[] memory validators, uint256[] memory weights) {
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
-        EnumerableSet.AddressSet
-            storage epochValidators = _activeValidatorsLists[
-                _epochs[epochsCount].validatorsListId
-            ];
-
+        EnumerableSet.AddressSet storage epochValidators = _activeValidatorsLists[_epochs[epochsCount].validatorsListId];
         uint256 epochValidatorsCount = epochValidators.length();
 
         weights = new uint256[](epochValidatorsCount);
@@ -648,14 +511,14 @@ contract DataLiquidityPool is
     /**
      * @dev Pauses the contract
      */
-    function pause() public onlyOwner {
+    function pause() public override onlyOwner {
         _pause();
     }
 
     /**
      * @dev Unpauses the contract
      */
-    function unpause() public onlyOwner {
+    function unpause() public override onlyOwner {
         _unpause();
     }
 
@@ -664,9 +527,7 @@ contract DataLiquidityPool is
      *
      * @param newMaxNumberOfValidators           new maximum number of validators
      */
-    function updateMaxNumberOfValidators(
-        uint256 newMaxNumberOfValidators
-    ) external override onlyOwner {
+    function updateMaxNumberOfValidators(uint256 newMaxNumberOfValidators) external override onlyOwner {
         maxNumberOfValidators = newMaxNumberOfValidators;
 
         emit MaxNumberOfValidatorsUpdated(newMaxNumberOfValidators);
@@ -688,11 +549,11 @@ contract DataLiquidityPool is
      *
      * @param newEpochRewardAmount                new epoch size
      */
-    function updateEpochRewardAmount(
-        uint256 newEpochRewardAmount
-    ) external override onlyOwner {
+    function updateEpochRewardAmount(uint256 newEpochRewardAmount) external override onlyOwner {
         createEpochs();
         epochRewardAmount = newEpochRewardAmount;
+
+        _epochs[epochsCount].reward = newEpochRewardAmount;
 
         emit EpochRewardAmountUpdated(newEpochRewardAmount);
     }
@@ -702,9 +563,7 @@ contract DataLiquidityPool is
      *
      * @param newFileRewardFactor                new file reward factor
      */
-    function updateFileRewardFactor(
-        uint256 newFileRewardFactor
-    ) external override onlyOwner {
+    function updateFileRewardFactor(uint256 newFileRewardFactor) external override onlyOwner {
         fileRewardFactor = newFileRewardFactor;
 
         emit FileRewardFactorUpdated(newFileRewardFactor);
@@ -715,9 +574,7 @@ contract DataLiquidityPool is
      *
      * @param newFileRewardDelay                new file reward delay
      */
-    function updateFileRewardDelay(
-        uint256 newFileRewardDelay
-    ) external override onlyOwner {
+    function updateFileRewardDelay(uint256 newFileRewardDelay) external override onlyOwner {
         fileRewardDelay = newFileRewardDelay;
 
         emit FileRewardDelayUpdated(newFileRewardDelay);
@@ -728,11 +585,8 @@ contract DataLiquidityPool is
      *
      * @param newValidationPeriod                new validation period
      */
-    function updateValidationPeriod(
-        uint256 newValidationPeriod
-    ) external onlyOwner {
+    function updateValidationPeriod(uint256 newValidationPeriod) external override onlyOwner {
         validationPeriod = newValidationPeriod;
-
         emit ValidationPeriodUpdated(newValidationPeriod);
     }
 
@@ -741,9 +595,7 @@ contract DataLiquidityPool is
      *
      * @param newValidatorScoreMinTrust                new validatorScoreMinTrust
      */
-    function updateValidatorScoreMinTrust(
-        uint256 newValidatorScoreMinTrust
-    ) external onlyOwner {
+    function updateValidatorScoreMinTrust(uint256 newValidatorScoreMinTrust) external override onlyOwner {
         validatorScoreMinTrust = newValidatorScoreMinTrust;
 
         emit ValidatorScoreMinTrustUpdated(newValidatorScoreMinTrust);
@@ -754,9 +606,7 @@ contract DataLiquidityPool is
      *
      * @param newValidatorScoreKappa                new validatorScoreKappa
      */
-    function updateValidatorScoreKappa(
-        uint256 newValidatorScoreKappa
-    ) external onlyOwner {
+    function updateValidatorScoreKappa(uint256 newValidatorScoreKappa) external override onlyOwner {
         validatorScoreKappa = newValidatorScoreKappa;
 
         emit ValidatorScoreKappaUpdated(newValidatorScoreKappa);
@@ -767,9 +617,7 @@ contract DataLiquidityPool is
      *
      * @param newValidatorScoreRho                new validatorScoreRho
      */
-    function updateValidatorScoreRho(
-        uint256 newValidatorScoreRho
-    ) external onlyOwner {
+    function updateValidatorScoreRho(uint256 newValidatorScoreRho) external override onlyOwner {
         validatorScoreRho = newValidatorScoreRho;
 
         emit ValidatorScoreRhoUpdated(newValidatorScoreRho);
@@ -780,9 +628,7 @@ contract DataLiquidityPool is
      *
      * @param newMinStakeAmount                new minStakeAmount
      */
-    function updateMinStakeAmount(
-        uint256 newMinStakeAmount
-    ) external onlyOwner {
+    function updateMinStakeAmount(uint256 newMinStakeAmount) external override onlyOwner {
         minStakeAmount = newMinStakeAmount;
 
         emit MinStakeAmountUpdated(newMinStakeAmount);
@@ -795,18 +641,11 @@ contract DataLiquidityPool is
      * @param validatorOwnerAddress              owner of the validator
      * @param stakeAmount                        amount to stake
      */
-    function registerValidator(
-        address validatorAddress,
-        address validatorOwnerAddress,
-        uint256 stakeAmount
-    ) external override whenNotPaused nonReentrant {
+    function registerValidator(address validatorAddress, address validatorOwnerAddress, uint256 stakeAmount) external override whenNotPaused nonReentrant {
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
         if (validator.status != ValidatorStatus.None) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.None),
-                uint256(validator.status)
-            );
+            revert InvalidValidatorStatus();
         }
 
         if (stakeAmount < minStakeAmount) {
@@ -828,29 +667,19 @@ contract DataLiquidityPool is
 
         totalStaked += stakeAmount;
 
-        emit ValidatorRegistered(
-            validatorAddress,
-            validatorOwnerAddress,
-            stakeAmount
-        );
+        emit ValidatorRegistered(validatorAddress, validatorOwnerAddress, stakeAmount);
     }
 
-    function approveValidator(address validatorAddress) public onlyOwner {
+    function approveValidator(address validatorAddress) external override onlyOwner {
         createEpochs();
         uint256 index;
 
-        EnumerableSet.AddressSet
-            storage activeValidatorsList = _activeValidatorsLists[
-                activeValidatorsListsCount
-            ];
+        EnumerableSet.AddressSet storage activeValidatorsList = _activeValidatorsLists[activeValidatorsListsCount];
         uint256 activeValidatorsListCount = activeValidatorsList.length();
 
         activeValidatorsListsCount++;
 
-        EnumerableSet.AddressSet
-            storage newActiveValidatorsList = _activeValidatorsLists[
-                activeValidatorsListsCount
-            ];
+        EnumerableSet.AddressSet storage newActiveValidatorsList = _activeValidatorsLists[activeValidatorsListsCount];
 
         for (index = 0; index < activeValidatorsListCount; index++) {
             newActiveValidatorsList.add(activeValidatorsList.at(index));
@@ -859,14 +688,10 @@ contract DataLiquidityPool is
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
         if (validator.status != ValidatorStatus.Registered) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Registered),
-                uint256(validator.status)
-            );
+            revert InvalidValidatorStatus();
         }
 
         newActiveValidatorsList.add(validatorAddress);
-        _validatorsWithFilesToVerify.add(validatorAddress);
 
         validator.status = ValidatorStatus.Active;
         validator.firstBlockNumber = block.number;
@@ -877,104 +702,64 @@ contract DataLiquidityPool is
     }
 
     /**
-     * @notice Approve validator
+     * @notice Deregister validator
      *
      * @param validatorAddress                        validator addresses
      */
-    function inactivateValidator(
-        address validatorAddress
-    ) public onlyValidatorOwner(validatorAddress) {
-        createEpochs();
-
+    function deregisterValidator(address validatorAddress) external override onlyValidatorOwner(validatorAddress) nonReentrant {
         if (
-            _validatorsInfo[validatorAddress].status != ValidatorStatus.Active
+            _validatorsInfo[validatorAddress].ownerAddress != msg.sender &&
+            msg.sender != owner()
         ) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Active),
-                uint256(_validatorsInfo[validatorAddress].status)
-            );
+            revert NotAllowed();
         }
 
-        _inactivateValidator(validatorAddress);
-    }
-
-    /**
-     * @notice Deregister validator and withdraw stake amount
-     *
-     * @param validatorAddress                        validator addresses
-     */
-    function deregisterValidator(
-        address validatorAddress
-    ) external onlyValidatorOwner(validatorAddress) nonReentrant {
-        createEpochs();
+        _deregisterValidator(validatorAddress);
 
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
-        if (validator.grantedAmount > 0) {
-            revert WithdrawNotAllowed();
-        }
-
-        if (validator.status == ValidatorStatus.Active) {
-            _inactivateValidator(validatorAddress);
-        } else if (
-            validator.status != ValidatorStatus.Registered &&
-            validator.status != ValidatorStatus.Inactive
-        ) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Inactive),
-                uint256(validator.status)
-            );
-        }
-
-        validator.status = ValidatorStatus.Deregistered;
-        totalStaked -= validator.stakeAmount;
-
-        token.safeTransfer(validator.ownerAddress, validator.stakeAmount);
-
-        emit ValidatorDeregistered(validatorAddress);
-    }
-
-    /**
-     * @notice Deregister validator and withdraw stake amount
-     *
-     * @param validatorAddress                        validator addresses
-     * @param validatorAmount                         amount to withdraw
-     */
-    function deregisterValidatorByOwner(
-        address validatorAddress,
-        uint256 validatorAmount
-    ) external onlyOwner {
-        createEpochs();
-
-        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
-
-        if (validator.status == ValidatorStatus.Active) {
-            _inactivateValidator(validatorAddress);
-        } else if (
-            validator.status != ValidatorStatus.Registered &&
-            validator.status != ValidatorStatus.Inactive
-        ) {
-            revert InvalidValidatorStatus(
-                uint256(ValidatorStatus.Inactive),
-                uint256(validator.status)
-            );
-        }
-
-        validator.status = ValidatorStatus.Deregistered;
-
-        if (validatorAmount < validator.stakeAmount) {
-            token.safeTransfer(validator.ownerAddress, validatorAmount);
-            token.safeTransfer(
-                owner(),
-                validator.stakeAmount - validatorAmount
-            );
-        } else {
+        if (validator.grantedAmount == 0) {
+            totalStaked -= validator.stakeAmount;
             token.safeTransfer(validator.ownerAddress, validator.stakeAmount);
+            validator.stakeAmount = 0;
+        }
+    }
+
+    /**
+     * @notice Deregister validator and withdraw stake amount
+     *
+     * @param validatorAddress                        validator addresses
+     * @param unstakeAmount                           amount to sent to validator owner
+     */
+    function deregisterValidatorByOwner(address validatorAddress, uint256 unstakeAmount) external override onlyOwner nonReentrant {
+        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
+
+        if (unstakeAmount > validator.stakeAmount) {
+            revert InvalidStakeAmount();
+        }
+
+        if (validator.status == ValidatorStatus.Active || validator.status == ValidatorStatus.Registered) {
+            _deregisterValidator(validatorAddress);
+        }
+
+        if (validator.status != ValidatorStatus.Deregistered) {
+            revert InvalidValidatorStatus();
+        }
+
+        uint256 penaltyAmount = validator.stakeAmount - unstakeAmount;
+
+        if (penaltyAmount > 0) {
+            token.safeTransfer(owner(), penaltyAmount);
+        }
+
+        if (unstakeAmount > 0) {
+            token.safeTransfer(validator.ownerAddress, unstakeAmount);
         }
 
         totalStaked -= validator.stakeAmount;
+        validator.stakeAmount = 0;
 
-        emit ValidatorDeregistered(validatorAddress);
+        emit ValidatorDeregisteredByOwner(validatorAddress, unstakeAmount, penaltyAmount);
     }
 
     /**
@@ -982,9 +767,7 @@ contract DataLiquidityPool is
      *
      * @param newMasterKey                       new master key
      */
-    function setMasterKey(
-        string memory newMasterKey
-    ) external onlyActiveValidators {
+    function setMasterKey(string memory newMasterKey) external override onlyActiveValidators {
         if (bytes(masterKey).length != 0) {
             revert MasterKeyAlreadySet();
         }
@@ -999,102 +782,101 @@ contract DataLiquidityPool is
      * @param url                                    file url
      * @param encryptedKey                           encrypted key
      */
-    function addFile(
-        string memory url,
-        string memory encryptedKey
-    ) external whenNotPaused {
-        createEpochs();
+    function addFile(string memory url, string memory encryptedKey) external override whenNotPaused {
         bytes32 urlHash = keccak256(abi.encodePacked(url));
-        if (_fileUrlHases.contains(urlHash)) {
+        if (_fileUrlHashes.contains(urlHash)) {
             revert FileAlreadyAdded();
         }
 
-        _fileUrlHases.add(urlHash);
-        uint256 filesId = _fileUrlHases.length();
+        _fileUrlHashes.add(urlHash);
+        uint256 fileId = _fileUrlHashes.length();
 
-        File storage file = _files[filesId];
+        File storage file = _files[fileId];
 
-        file.contributorAddress = msg.sender;
+        file.ownerAddress = msg.sender;
         file.url = url;
         file.encryptedKey = encryptedKey;
         file.addedTimestamp = block.timestamp;
-
-        uint256 epochValidatorsListId = _epochs[epochsCount].validatorsListId;
-
-        uint256 epochValidatorsCount = _activeValidatorsLists[
-            epochValidatorsListId
-        ].length();
-
-        address assignedValidator = _activeValidatorsLists[
-            epochValidatorsListId
-        ].at(filesId % epochValidatorsCount);
-
-        ValidatorInfo storage validator = _validatorsInfo[assignedValidator];
-        validator.filesToVerifyCount++;
-        validator.filesToVerify[validator.filesToVerifyCount] = filesId;
+        file.addedAtBlock = block.number;
 
         ContributorInfo storage contributor = _contributorInfo[msg.sender];
         contributor.fileIdsCount++;
-        contributor.fileIds[contributor.fileIdsCount] = filesId;
+        contributor.fileIds[contributor.fileIdsCount] = fileId;
 
-        emit FileAdded(msg.sender, filesId);
+        if (contributor.fileIdsCount == 1) {
+            contributorsCount++;
+            _contributors[contributorsCount] = msg.sender;
+        }
+
+        emit FileAdded(msg.sender, fileId);
     }
 
     /**
      * @notice Verify a file
      *
-     * @param fileId                              file id
-     * @param score                               score of the verification
-     * @param metadata                            metadata
+     * @param fileId                             file id
+     * @param valid                              whether the file is valid
+     * @param score                              score of the verification
+     * @param authenticity                       authenticity score
+     * @param ownership                          ownership score
+     * @param quality                            quality score
+     * @param uniqueness                         uniqueness score
      */
-    function verifyFile(
-        uint256 fileId,
-        uint256 score,
-        string memory metadata
-    ) external onlyActiveValidators {
+    function verifyFile(uint256 fileId, bool valid, uint256 score, uint256 authenticity, uint256 ownership, uint256 quality, uint256 uniqueness) external override onlyActiveValidators {
         createEpochs();
 
-        if (_files[fileId].verificationsCount > 0) {
-            revert FileAlreadyVerified();
-        }
+        FileResponse memory nextFile = getNextFileToVerify(msg.sender);
 
-        NextFileToVerify memory nextFileToVerify = getNextFileToVerify(
-            msg.sender
-        );
-
-        if (nextFileToVerify.fileId != fileId || fileId == 0) {
+        if (nextFile.fileId != fileId) {
             revert InvalidFileId();
         }
 
         File storage file = _files[fileId];
+        if (file.scores[msg.sender].reportedAtBlock != 0) {
+            revert FileAlreadyVerified();
+        }
 
-        FileVerificationInfo storage verification = file.verifications[
-            file.verificationsCount
-        ];
+        file.scores[msg.sender] = FileScore({
+            valid: valid,
+            score: score,
+            reportedAtBlock: block.number,
+            authenticity: authenticity,
+            ownership: ownership,
+            quality: quality,
+            uniqueness: uniqueness
+        });
 
         file.verificationsCount++;
 
-        verification.validatorAddress = msg.sender;
-        // TODO: fix spelling
-        verification.timespatmp = block.timestamp;
-        verification.score = score;
-        verification.metadata = metadata;
+        // Update file's overall scores if this is the first verification
+        if (file.verificationsCount == 1) {
+            file.valid = valid;
+            file.score = score;
+            file.authenticity = authenticity;
+            file.ownership = ownership;
+            file.quality = quality;
+            file.uniqueness = uniqueness;
+            file.reward = (score * fileRewardFactor) / 1e18;
+        } else {
+            // Aggregate scores
+            file.valid = file.valid && valid;
+            file.score = (file.score * (file.verificationsCount - 1) + score) / file.verificationsCount;
+            file.authenticity = (file.authenticity * (file.verificationsCount - 1) + authenticity) / file.verificationsCount;
+            file.ownership = (file.ownership * (file.verificationsCount - 1) + ownership) / file.verificationsCount;
+            file.quality = (file.quality * (file.verificationsCount - 1) + quality) / file.verificationsCount;
+            file.uniqueness = (file.uniqueness * (file.verificationsCount - 1) + uniqueness) / file.verificationsCount;
+            file.reward = (file.score * fileRewardFactor) / 1e18;
+        }
 
-        file.reward = score * fileRewardFactor / 1e18;
+        // Update the last verified file for this validator
+        ValidatorInfo storage validator = _validatorsInfo[msg.sender];
+        if (fileId > validator.lastVerifiedFile) {
+            validator.lastVerifiedFile = fileId;
+        }
 
-        ValidatorInfo storage validator = _validatorsInfo[
-            nextFileToVerify.assignedValidator
-        ];
-        validator.filesToVerifyIndex++;
-
-        if (
-            validator.filesToVerifyIndex == validator.filesToVerifyCount &&
-            validator.status != ValidatorStatus.Active &&
-            nextFileToVerify.assignedValidator != address(0)
-        ) {
-            _validatorsWithFilesToVerify.remove(
-                nextFileToVerify.assignedValidator
-            );
+        if (file.verificationsCount > _activeValidatorsLists[activeValidatorsListsCount].length() / 2) {
+            file.finalized = true;
+            lastFinalizedFileId = fileId;
         }
 
         emit FileVerified(msg.sender, fileId, score);
@@ -1142,10 +924,7 @@ contract DataLiquidityPool is
     /**
      * @notice Set the weights for the validators
      */
-    function updateWeights(
-        address[] memory validators,
-        uint256[] memory weights
-    ) external onlyActiveValidators {
+    function updateWeights(address[] memory validators, uint256[] memory weights) external override onlyActiveValidators {
         createEpochs();
 
         uint256 length = validators.length;
@@ -1166,9 +945,7 @@ contract DataLiquidityPool is
     /**
      * @notice Add rewards for validators
      */
-    function addRewardForValidators(
-        uint256 validatorsRewardAmount
-    ) external nonReentrant {
+    function addRewardForValidators(uint256 validatorsRewardAmount) external override nonReentrant {
         token.safeTransferFrom(msg.sender, address(this), validatorsRewardAmount);
         totalValidatorsRewardAmount += validatorsRewardAmount;
     }
@@ -1176,21 +953,25 @@ contract DataLiquidityPool is
     /**
      * @notice Add rewards for contributors
      */
-    function addRewardsForContributors(
-        uint256 contributorsRewardAmount
-    ) external nonReentrant {
+    function addRewardsForContributors(uint256 contributorsRewardAmount) external override nonReentrant {
         token.safeTransferFrom(msg.sender, address(this), contributorsRewardAmount);
         totalContributorsRewardAmount += contributorsRewardAmount;
     }
 
-    function claimContributionReward(uint256 fileId) external {
+    function claimContributionReward(uint256 fileId) external override {
         File storage file = _files[fileId];
 
-        if (file.contributorAddress != msg.sender) {
+        if (file.ownerAddress != msg.sender) {
             revert NotFileOwner();
         }
 
-        if (file.rewardWithdrawn > 0 || file.addedTimestamp + fileRewardDelay > block.timestamp || totalContributorsRewardAmount < file.reward) {
+        if (!file.finalized) {
+            revert NotFinalized();
+        }
+
+        if (file.rewardWithdrawn > 0 ||
+            file.addedTimestamp + fileRewardDelay > block.timestamp ||
+            totalContributorsRewardAmount < file.reward) {
             revert WithdrawNotAllowed();
         }
 
@@ -1198,6 +979,29 @@ contract DataLiquidityPool is
         token.safeTransfer(msg.sender, file.reward);
 
         emit ContributionRewardClaimed(msg.sender, fileId, file.reward);
+    }
+
+    function claimUnsentReward(address validatorAddress, uint256 epochNumber) external override onlyValidatorOwner(validatorAddress) {
+        Epoch storage epoch = _epochs[epochNumber];
+        ValidatorReward storage validatorReward = epoch.validatorRewards[validatorAddress];
+
+        ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
+
+        uint256 validatorRewardAmount = (validatorReward.score * epoch.reward) / 1e18;
+
+        if (validatorRewardAmount <= validatorReward.withdrawnAmount) {
+            revert NothingToClaim();
+        }
+
+        uint256 unclaimedReward = validatorRewardAmount - validatorReward.withdrawnAmount;
+
+        if (totalValidatorsRewardAmount > unclaimedReward) {
+            epoch.validatorRewards[validatorAddress].withdrawnAmount = validatorRewardAmount;
+            totalValidatorsRewardAmount -= unclaimedReward;
+            token.safeTransfer(validator.ownerAddress, unclaimedReward);
+
+            emit EpochRewardClaimed(validatorAddress, epochNumber, unclaimedReward);
+        }
     }
 
     /**
@@ -1407,13 +1211,8 @@ contract DataLiquidityPool is
      *
      * @param epochNumber                   epoch number
      */
-    function getEmissionScores(
-        uint256 epochNumber
-    ) public view returns (uint256[] memory) {
-        EnumerableSet.AddressSet
-            storage epochValidators = _activeValidatorsLists[
-                _epochs[epochNumber].validatorsListId
-            ];
+    function getEmissionScores(uint256 epochNumber) public view override returns (uint256[] memory) {
+        EnumerableSet.AddressSet storage epochValidators = _activeValidatorsLists[_epochs[epochNumber].validatorsListId];
 
         uint256 epochValidatorsCount = epochValidators.length();
 
@@ -1435,9 +1234,7 @@ contract DataLiquidityPool is
         for (uint256 i = 0; i < epochValidatorsCount; i++) {
             W[i] = new uint256[](epochValidatorsCount);
 
-            ValidatorInfo storage validator = _validatorsInfo[
-                epochValidators.at(i)
-            ];
+            ValidatorInfo storage validator = _validatorsInfo[epochValidators.at(i)];
 
             for (uint256 j = 0; j < epochValidatorsCount; j++) {
                 W[i][j] = validator.weights[epochValidators.at(j)];
@@ -1457,57 +1254,47 @@ contract DataLiquidityPool is
      * @param epochNumber                   epoch number
      */
     function _setEmissionScores(uint256 epochNumber) internal {
-        EnumerableSet.AddressSet
-            storage epochValidators = _activeValidatorsLists[
-                _epochs[epochNumber].validatorsListId
-            ];
+        EnumerableSet.AddressSet storage epochValidators = _activeValidatorsLists[_epochs[epochNumber].validatorsListId];
 
         uint256 epochValidatorsCount = epochValidators.length();
 
-        uint256[] memory shares = getEmissionScores(epochNumber);
+        uint256[] memory scores = getEmissionScores(epochNumber);
 
         Epoch storage epoch = _epochs[epochNumber];
         for (uint256 i = 0; i < epochValidatorsCount; i++) {
             address validatorAddress = epochValidators.at(i);
-            uint256 validatorReward = (shares[i] * epoch.reward) / 1e18;
+            uint256 validatorReward = (scores[i] * epoch.reward) / 1e18;
 
-            uint256 validatorRewardDiff = validatorReward -
-                epoch.validatorRewards[validatorAddress].withdrawnAmount;
+            ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
 
-            epoch.validatorRewards[validatorAddress].share = shares[i];
-            epoch
-                .validatorRewards[validatorAddress]
-                .withdrawnAmount = validatorReward;
+            epoch.validatorRewards[validatorAddress].score = scores[i];
 
             //send the reward to the validator
-            if (
-                validatorRewardDiff > 0 &&
-                totalValidatorsRewardAmount > validatorRewardDiff
-            ) {
-                totalValidatorsRewardAmount -= validatorRewardDiff;
-                token.safeTransfer(
-                    _validatorsInfo[validatorAddress].ownerAddress,
-                    validatorRewardDiff
-                );
+            if (validatorReward > 0 && totalValidatorsRewardAmount > validatorReward) {
+                epoch.validatorRewards[validatorAddress].withdrawnAmount = validatorReward;
+                totalValidatorsRewardAmount -= validatorReward;
+                token.safeTransfer(validator.ownerAddress, validatorReward);
             }
         }
     }
+    function _deregisterValidator(address validatorAddress) internal {
+        createEpochs();
 
-    function _inactivateValidator(address validatorAddress) internal {
         ValidatorInfo storage validator = _validatorsInfo[validatorAddress];
+
+        if (validator.status != ValidatorStatus.Registered &&
+            validator.status != ValidatorStatus.Active) {
+            revert InvalidValidatorStatus();
+        }
 
         uint256 index;
 
-        EnumerableSet.AddressSet storage currentList = _activeValidatorsLists[
-            activeValidatorsListsCount
-        ];
+        EnumerableSet.AddressSet storage currentList = _activeValidatorsLists[activeValidatorsListsCount];
         uint256 currentListCount = currentList.length();
 
         activeValidatorsListsCount++;
 
-        EnumerableSet.AddressSet storage newList = _activeValidatorsLists[
-            activeValidatorsListsCount
-        ];
+        EnumerableSet.AddressSet storage newList = _activeValidatorsLists[activeValidatorsListsCount];
 
         for (index = 0; index < currentListCount; index++) {
             if (currentList.at(index) != validatorAddress) {
@@ -1515,15 +1302,11 @@ contract DataLiquidityPool is
             }
         }
 
-        if (validator.filesToVerifyCount == validator.filesToVerifyIndex) {
-            _validatorsWithFilesToVerify.remove(validatorAddress);
-        }
-
         _epochs[epochsCount].validatorsListId = activeValidatorsListsCount;
 
-        validator.status = ValidatorStatus.Inactive;
+        validator.status = ValidatorStatus.Deregistered;
         validator.lastBlockNumber = block.number;
 
-        emit ValidatorInactivated(validatorAddress);
+        emit ValidatorDeregistered(validatorAddress);
     }
 }

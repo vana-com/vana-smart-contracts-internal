@@ -16,8 +16,7 @@ module.exports = {
       optimizer: {
         enabled: true,
         runs: 200
-      },
-      viaIR: true,
+      }
     }
   },
   networks: {
@@ -27,18 +26,12 @@ module.exports = {
       url: process.env.SATORI_RPC_URL || "",
       accounts:
         process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-    },
-    moksha: {
-      url: process.env.MOKSHA_RPC_URL || "",
-      accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     }
   },
   etherscan: {
     apiKey: {
       // Is not required by blockscout. Can be any non-empty string
       satori: "abc",
-      moksha: "abc"
     },
     customChains: [
       {
@@ -47,14 +40,6 @@ module.exports = {
         urls: {
           apiURL: process.env.SATORI_API_URL || "",
           browserURL: process.env.SATORI_BROWSER_URL || "",
-        }
-      },
-      {
-        network: "moksha",
-        chainId: 14800,
-        urls: {
-          apiURL: process.env.MOKSHA_API_URL || "",
-          browserURL: process.env.MOKSHA_BROWSER_URL || "",
         }
       }
     ]
