@@ -2,7 +2,6 @@ import { ethers, upgrades } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { parseEther } from "ethers";
-import { env } from "process";
 import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -11,13 +10,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const dlpName = process.env.DLP_NAME ?? "Custom Data Liquidity Pool";
 	const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
+
 	const tokenName = process.env.DLP_TOKEN_NAME ?? "Custom Data Autonomy Token";
 	const tokenSymbol = process.env.DLP_TOKEN_SYMBOL ?? "CUSTOMDAT";
 
-	const dlptDeploy = await ethers.deployContract("DLPT", [tokenName, tokenSymbol, ownerAddress]);
-	const dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
+	const dlptDeploy = await ethers.deployContract("ChatGPTDAT", [tokenName, tokenSymbol, ownerAddress]);
 
-	console.log("DataLiquidityPoolToken deployed at:", dlptDeploy.target);
+	const dlpt = await ethers.getContractAt("ChatGPTDAT", dlptDeploy.target);
+
+	console.log("ChatGPTDAT deployed at:", dlptDeploy.target);
 
 	const maxNumberOfValidators = 3;
 	const validatorScoreMinTrust = parseEther('0.1');
@@ -29,10 +30,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const startBlock: number = await getCurrentBlockNumber();
 	const rewardAmount = parseEther('10');
 	const fileRewardFactor = parseEther('5');
-	const fileRewardDelay = 3600 * 24 * 3;
+	const fileRewardDelay = 0;
 
 	const dlpDeploy = await upgrades.deployProxy(
-		await ethers.getContractFactory("DataLiquidityPool"),
+		await ethers.getContractFactory("ChatGPTDLP"),
 		[{
 			name: dlpName,
 			ownerAddress,
@@ -53,7 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 			kind: "uups"
 		}
 	);
-	const dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
+	const dlp = await ethers.getContractAt("ChatGPTDLP", dlpDeploy.target);
 
 	console.log(`DataLiquidityPool "${dlpName}" deployed at:`, dlp.target);
 

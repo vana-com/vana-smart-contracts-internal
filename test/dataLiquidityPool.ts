@@ -79,13 +79,13 @@ describe("DataLiquidityPool", () => {
       user1, user2, user3, user4, user5, user6, user7, user8, user9, user10, user11, user12, user13, user14, user15
     ] = await ethers.getSigners();
 
-    const dlptDeploy = await ethers.deployContract("DLPT", [dlpTokenName, dlpTokenSymbol, owner]);
-    dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
+    const dlptDeploy = await ethers.deployContract("ChatGPTDAT", [dlpTokenName, dlpTokenSymbol, owner]);
+    dlpt = await ethers.getContractAt("ChatGPTDAT", dlptDeploy.target);
 
     startBlock = await getCurrentBlockNumber() + 1;
 
     const dlpDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("DataLiquidityPool"),
+      await ethers.getContractFactory("ChatGPTDLP"),
       [[
         dlpName,
         owner.address,
@@ -107,7 +107,7 @@ describe("DataLiquidityPool", () => {
       }
     );
 
-    dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
+    dlp = await ethers.getContractAt("ChatGPTDLP", dlpDeploy.target);
 
     await dlpt.connect(owner).mint(dlp, dlpInitialBalance);
     await dlpt.connect(owner).mint(v1Owner, v1OwnerInitialBalance);
@@ -2058,7 +2058,7 @@ describe("DataLiquidityPool", () => {
     });
 
 
-    it.only("should get nextFileToVerify based on last finalized file", async function () {
+    it("should get nextFileToVerify based on last finalized file", async function () {
       await registerValidators();
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");

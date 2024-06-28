@@ -22,7 +22,7 @@ describe("ERC20Swapper", () => {
   const deploy = async () => {
     [deployer, owner, admin, user1, user2, user3, user4] = await ethers.getSigners();
 
-    dlpt = await ethers.deployContract("DLPT", ["Test Data Autonomy Token", "TDAT", owner.address]);
+    dlpt = await ethers.deployContract("ChatGPTDAT", ["Test Data Autonomy Token", "TDAT", owner.address]);
     await dlpt.waitForDeployment();
 
     await dlpt.connect(owner).changeAdmin(admin);

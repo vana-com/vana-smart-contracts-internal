@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/IAccessControl.sol";
 
-interface IDataLiquidityPool is IAccessControl {
+interface IChatGPTDLP is IAccessControl {
     enum ValidatorStatus {
         None,
         Registered,

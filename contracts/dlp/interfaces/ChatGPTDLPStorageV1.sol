@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "./IDataLiquidityPool.sol";
+import "./IChatGPTDLP.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
- * @title Storage for DataLiquidityPool
- * @notice For future upgrades, do not change DataLiquidityPoolStorageV1. Create a new
- * contract which implements DataLiquidityPoolStorageV1
+ * @title Storage for ChatGPT DataLiquidityPool
+ * @notice For future upgrades, do not change ChatGPTDLPStorageV1. Create a new
+ * contract which implements ChatGPTDLPStorageV1
  */
-abstract contract DataLiquidityPoolStorageV1 is IDataLiquidityPool {
+abstract contract ChatGPTDLPStorageV1 is IChatGPTDLP {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 

@@ -8,17 +8,15 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/DataLiquidityPoolStorageV1.sol";
+import "./interfaces/ChatGPTDLPStorageV1.sol";
 
-import "hardhat/console.sol";
-
-contract DataLiquidityPool is
+contract ChatGPTDLP is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
-    DataLiquidityPoolStorageV1
+    ChatGPTDLPStorageV1
 {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
