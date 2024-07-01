@@ -55,9 +55,20 @@ npx hardhat verify --network satori <data_liquidity_pool_token_address> "<token_
 
 If you get an error, it may be because the block explorer has already verified matching bytecode. Check your contract in the block explorer. If it is verified, you can ignore the error.
 
-10. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/address/<contract_address>. .
+10. Congratulations, you've deployed the DLP & token smart contracts. You can confirm it's up by searching the address on the block explorer: https://satori.vanascan.io/address/<contract_address>.
 
-11. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlp-upgrade.ts` script:
+11. Now you should configure the deployed DLP contract:
+    1. Visit the Satori block explorer: https://satori.vanascan.io/address/<contract_address>
+    2. Go to the "Write proxy" tab
+    3. Connect your wallet (make sure it's the owner wallet used for deployment)
+    4. Set the following parameters:
+        - Call `updateFileRewardDelay` and set it to 0
+        - Call `addRewardsForContributors` with a large value (e.g., 1000000000000000000000000 for 1 million tokens)
+    5. For each function call, confirm the transaction in your wallet
+
+   These steps ensure that rewards can be claimed immediately and that there are sufficient tokens allocated for rewards.
+
+12. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlp-upgrade.ts` script:
 
 ```bash
 npx hardhat deploy --network satori --tags DLPUpgrade
