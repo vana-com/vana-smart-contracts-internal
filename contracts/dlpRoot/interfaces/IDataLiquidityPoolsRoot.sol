@@ -13,6 +13,7 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
     }
 
     struct DlpInfo {
+        uint256 id;
         address payable ownerAddress;
         uint256 stakeAmount;
         DlpStatus status;
@@ -33,6 +34,11 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         uint256 reward;
         uint256 dlpsListId;
         mapping(address => DlpReward) dlpRewards;
+    }
+
+    struct StakerInfo {
+        uint256 totalStaked;
+        mapping(uint256 => uint256) stakedDlps;
     }
 
     function version() external pure returns (uint256);
@@ -61,11 +67,11 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
             uint256[] memory withdrawnAmounts
         );
     function minStakeAmount() external view returns (uint256);
-    function totalStaked() external view returns (uint256);
     function totalDlpsRewardAmount() external view returns (uint256);
     function epochRewardAmount() external view returns (uint256);
     function dlpsCount() external view returns (uint256);
     struct DlpInfoResponse {
+        uint256 id;
         address dlpAddress;
         address ownerAddress;
         uint256 stakeAmount;
@@ -80,6 +86,8 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         address dlpAddress
     ) external view returns (DlpInfoResponse memory);
     function dlpScores() external view returns (address[] memory dlps, uint256[] memory scores);
+    function stakers(address staker) external view returns (uint256 totalStaked);
+    function stakedDlps(address staker, uint256 dlpId) external view returns (uint256 dlpStaked);
     function pause() external;
     function unpause() external;
     function updateMaxNumberOfDlps(uint256 newMaxNumberOfDlps) external;
@@ -105,4 +113,5 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
     ) external;
     function addRewardForDlps() external payable;
     function claimUnsentReward(address dlpAddress, uint256 epochNumber) external;
+    function stake(uint256 dlpId) external payable;
 }

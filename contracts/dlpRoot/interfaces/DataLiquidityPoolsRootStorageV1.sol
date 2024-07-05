@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 abstract contract DataLiquidityPoolsRootStorageV1 is IDataLiquidityPoolsRoot {
     uint256 public override maxNumberOfDlps;
     uint256 public override minStakeAmount;
-    uint256 public override totalStaked;
     uint256 public override totalDlpsRewardAmount;
     uint256 public override epochRewardAmount;
     uint256 public override epochSize;
@@ -26,5 +25,9 @@ abstract contract DataLiquidityPoolsRootStorageV1 is IDataLiquidityPoolsRoot {
 
     uint256 public override epochsCount;
     mapping(uint256 => Epoch) internal _epochs;
+
+    mapping(address => StakerInfo) internal _stakersInfo;
+    // mapping(uint256 => StakerInfo) internal _stakerInfo;
+    // mapping(address => StakerInfo) internal _stakerInfo;
 
 }

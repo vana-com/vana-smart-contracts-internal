@@ -27,26 +27,6 @@ contract DataLiquidityPoolsRoot is
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Triggered when a dlp has staked some DAT
-     *
-     * @param dlpAddress                   address of the dlp
-     * @param amount                             amount staked in this call
-     * @param totalAmount                        total amount staked by the dlp
-     */
-    event Staked(
-        address indexed dlpAddress,
-        uint256 amount,
-        uint256 totalAmount
-    );
-    /**
-     * @notice Triggered when a dlp has unstaked some DAT
-     *
-     * @param stakerAddress                      address of the staker
-     * @param amount                             amount unstaked
-     */
-    event Unstaked(address indexed stakerAddress, uint256 amount);
-
-    /**
      * @notice Triggered when a dlp has registered
      *
      * @param dlpAddress                   address of the dlp
@@ -143,10 +123,28 @@ contract DataLiquidityPoolsRoot is
      * @param epochId                             epcoch id
      * @param claimAmount                         amount claimed
      */
-    event EpochRewardClaimed(
-        address dlp,
-        uint256 epochId,
-        uint256 claimAmount
+    event EpochRewardClaimed(address dlp, uint256 epochId, uint256 claimAmount);
+
+    /**
+     * @notice Triggered when user has staked some DAT for a DLP
+     *
+     * @param staker                            address of the staker
+     * @param dlpId                             id of the dlp
+     * @param amount                            amount staked
+     */
+    event Staked(address indexed staker, uint256 indexed dlpId, uint256 amount);
+
+    /**
+     * @notice Triggered when user has unstaked some DAT from a DLP
+     *
+     * @param staker                            address of the staker
+     * @param dlpId                             id of the dlp
+     * @param amount                            amount unstaked
+     */
+    event Unstaked(
+        address indexed staker,
+        uint256 indexed dlpId,
+        uint256 amount
     );
 
     error InvalidStakeAmount();
@@ -247,6 +245,7 @@ contract DataLiquidityPoolsRoot is
     ) public view override returns (DlpInfoResponse memory) {
         return
             DlpInfoResponse(
+                _dlpsInfo[dlpAddress].id,
                 dlpAddress,
                 _dlpsInfo[dlpAddress].ownerAddress,
                 _dlpsInfo[dlpAddress].stakeAmount,
@@ -348,6 +347,19 @@ contract DataLiquidityPoolsRoot is
         }
     }
 
+    function stakers(
+        address staker
+    ) external view override returns (uint256 totalStaked) {
+        return _stakersInfo[staker].totalStaked;
+    }
+
+    function stakedDlps(
+        address staker,
+        uint256 dlpId
+    ) external view override returns (uint256 dlpStaked) {
+        return _stakersInfo[staker].stakedDlps[dlpId];
+    }
+
     /**
      * @dev Pauses the contract
      */
@@ -435,10 +447,6 @@ contract DataLiquidityPoolsRoot is
             revert InvalidStakeAmount();
         }
 
-        dlp.ownerAddress = dlpOwnerAddress;
-        dlp.stakeAmount = msg.value;
-        dlp.status = DlpStatus.Registered;
-
         if (msg.sender == owner()) {
             dlp.grantedAmount = msg.value;
         }
@@ -446,7 +454,11 @@ contract DataLiquidityPoolsRoot is
         dlpsCount++;
         _dlps[dlpsCount] = dlpAddress;
 
-        totalStaked += msg.value;
+        dlp.id = dlpsCount;
+        dlp.ownerAddress = dlpOwnerAddress;
+        dlp.status = DlpStatus.Registered;
+
+        _addStake(dlpOwnerAddress, dlpsCount, msg.value);
 
         emit DlpRegistered(dlpAddress, dlpOwnerAddress, msg.value);
     }
@@ -506,9 +518,11 @@ contract DataLiquidityPoolsRoot is
         DlpInfo storage dlp = _dlpsInfo[dlpAddress];
 
         if (dlp.grantedAmount == 0) {
-            totalStaked -= dlp.stakeAmount;
-            payable(dlp.ownerAddress).transfer(dlp.stakeAmount);
-            dlp.stakeAmount = 0;
+            _unstake(
+                dlp.ownerAddress,
+                dlp.id,
+                _stakersInfo[dlp.ownerAddress].stakedDlps[dlp.id]
+            );
         }
     }
 
@@ -540,6 +554,14 @@ contract DataLiquidityPoolsRoot is
 
         uint256 penaltyAmount = dlp.stakeAmount - unstakeAmount;
 
+        StakerInfo storage _stakerInfo = _stakersInfo[dlp.ownerAddress];
+
+        uint256 ownerStakeAmount = _stakerInfo.stakedDlps[dlp.id];
+        dlp.stakeAmount -= ownerStakeAmount;
+
+        _stakerInfo.totalStaked -= ownerStakeAmount;
+        _stakerInfo.stakedDlps[dlp.id] = 0;
+
         if (penaltyAmount > 0) {
             payable(owner()).transfer(penaltyAmount);
         }
@@ -548,9 +570,7 @@ contract DataLiquidityPoolsRoot is
             payable(dlp.ownerAddress).transfer(unstakeAmount);
         }
 
-        totalStaked -= dlp.stakeAmount;
-        dlp.stakeAmount = 0;
-
+        emit Unstaked(dlp.ownerAddress, dlp.id, unstakeAmount);
         emit DlpDeregisteredByOwner(dlpAddress, unstakeAmount, penaltyAmount);
     }
 
@@ -604,7 +624,10 @@ contract DataLiquidityPoolsRoot is
 
         uint256 length = dlps.length;
 
-        if (length != scores.length || length != _activeDlpsLists[activeDlpsListsCount].length()) {
+        if (
+            length != scores.length ||
+            length != _activeDlpsLists[activeDlpsListsCount].length()
+        ) {
             revert ArityMismatch();
         }
 
@@ -634,8 +657,10 @@ contract DataLiquidityPoolsRoot is
         totalDlpsRewardAmount += msg.value;
     }
 
-
-    function claimUnsentReward(address dlpAddress, uint256 epochNumber) external onlyDlpOwner(dlpAddress) {
+    function claimUnsentReward(
+        address dlpAddress,
+        uint256 epochNumber
+    ) external onlyDlpOwner(dlpAddress) {
         Epoch storage epoch = _epochs[epochNumber];
         DlpReward storage dlpReward = epoch.dlpRewards[dlpAddress];
 
@@ -650,14 +675,16 @@ contract DataLiquidityPoolsRoot is
         uint256 unclaimedReward = dlpRewardAmount - dlpReward.withdrawnAmount;
 
         if (totalDlpsRewardAmount > unclaimedReward) {
-            epoch
-                .dlpRewards[dlpAddress]
-                .withdrawnAmount = dlpRewardAmount;
+            epoch.dlpRewards[dlpAddress].withdrawnAmount = dlpRewardAmount;
             totalDlpsRewardAmount -= unclaimedReward;
             dlp.ownerAddress.transfer(unclaimedReward);
 
             emit EpochRewardClaimed(dlpAddress, epochNumber, unclaimedReward);
         }
+    }
+
+    function stake(uint256 dlpId) public payable override {
+        _addStake(msg.sender, dlpId, msg.value);
     }
 
     function _deregisterDlp(address dlpAddress) internal {
@@ -729,5 +756,39 @@ contract DataLiquidityPoolsRoot is
                 dlp.ownerAddress.transfer(dlpRewardAmount);
             }
         }
+    }
+
+    function _addStake(
+        address stakerAddress,
+        uint256 dlpId,
+        uint256 amount
+    ) internal {
+        StakerInfo storage _stakerInfo = _stakersInfo[stakerAddress];
+
+        _stakerInfo.totalStaked += amount;
+        _stakerInfo.stakedDlps[dlpId] += amount;
+
+        DlpInfo storage dlp = _dlpsInfo[_dlps[dlpId]];
+        dlp.stakeAmount += amount;
+
+        emit Staked(stakerAddress, dlpId, amount);
+    }
+
+    function _unstake(
+        address stakerAddress,
+        uint256 dlpId,
+        uint256 amount
+    ) internal {
+        StakerInfo storage _stakerInfo = _stakersInfo[stakerAddress];
+
+        _stakerInfo.totalStaked -= amount;
+        _stakerInfo.stakedDlps[dlpId] -= amount;
+
+        DlpInfo storage dlp = _dlpsInfo[_dlps[dlpId]];
+        dlp.stakeAmount -= amount;
+
+        payable(stakerAddress).transfer(amount);
+
+        emit Unstaked(stakerAddress, dlpId, amount);
     }
 }

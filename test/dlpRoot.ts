@@ -429,7 +429,8 @@ describe("DataLiquidityPoolsRoot", () => {
 
       (await dlpRoot.activeDlpsListsCount()).should.eq(0);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance - parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
@@ -460,7 +461,8 @@ describe("DataLiquidityPoolsRoot", () => {
 
       (await dlpRoot.activeDlpsListsCount()).should.eq(0);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(user1)).should.eq(user1InitialBalance - parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
@@ -491,7 +493,8 @@ describe("DataLiquidityPoolsRoot", () => {
 
       (await dlpRoot.activeDlpsListsCount()).should.eq(0);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance - parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
@@ -551,7 +554,14 @@ describe("DataLiquidityPoolsRoot", () => {
 
       (await dlpRoot.activeDlpsListsCount()).should.eq(0);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100') + parseEther('200') + parseEther('300'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
+
+      (await dlpRoot.stakers(dlp2Owner)).should.eq(parseEther('200'));
+      (await dlpRoot.stakedDlps(dlp2Owner, 2)).should.eq(parseEther('200'));
+
+      (await dlpRoot.stakers(dlp3Owner)).should.eq(parseEther('300'));
+      (await dlpRoot.stakedDlps(dlp3Owner, 3)).should.eq(parseEther('300'));
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance - parseEther('100') - BigInt(receipt1.gasUsed * tx1.gasPrice));
       (await ethers.provider.getBalance(dlp2Owner)).should.eq(dlp2OwnerInitialBalance - parseEther('200') - BigInt(receipt2.gasUsed * tx2.gasPrice));
@@ -840,7 +850,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(dlp1Owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -865,7 +876,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(0);
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance);
@@ -875,7 +887,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -898,7 +911,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
     });
@@ -929,8 +943,6 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("should deregisterDlp #multiple dlps", async function () {
       await registerDlps();
-
-      (await dlpRoot.totalStaked()).should.eq(5n * parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
 
@@ -981,7 +993,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList4 = await dlpRoot.activeDlpsLists(4);
       (await activeDlpsList4).should.deep.eq([dlp2.address, dlp3.address]);
 
-      (await dlpRoot.totalStaked()).should.eq(4n * parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
@@ -1040,7 +1053,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(dlp1Owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -1069,7 +1083,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(0);
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('100'));
@@ -1081,7 +1096,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -1111,7 +1127,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('0'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('100'));
@@ -1122,7 +1139,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
       const ownerInitialBalance = await ethers.provider.getBalance(owner);
@@ -1151,7 +1169,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('0'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance + parseEther('60') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('40'));
@@ -1162,7 +1181,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -1191,8 +1211,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('0'));
-
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance + parseEther('100') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance);
@@ -1203,7 +1223,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await dlpRoot.connect(owner).registerDlp(dlp1, dlp1Owner, { value: parseEther('100') });
       await dlpRoot.connect(owner).approveDlp(dlp1);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('100'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + parseEther('100'));
 
@@ -1235,7 +1256,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList2 = await dlpRoot.activeDlpsLists(2);
       (await activeDlpsList2).should.deep.eq([]);
 
-      (await dlpRoot.totalStaked()).should.eq(parseEther('0'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(owner)).should.eq(ownerInitialBalance + parseEther('60') - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('40'));
@@ -1268,8 +1290,6 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("should deregisterDlpByOwner #multiple dlps 1", async function () {
       await registerDlps();
-
-      (await dlpRoot.totalStaked()).should.eq(5n * parseEther('100'));
 
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
 
@@ -1319,7 +1339,8 @@ describe("DataLiquidityPoolsRoot", () => {
       const activeDlpsList4 = await dlpRoot.activeDlpsLists(4);
       (await activeDlpsList4).should.deep.eq([dlp2.address, dlp3.address]);
 
-      (await dlpRoot.totalStaked()).should.eq(4n * parseEther('100'));
+      (await dlpRoot.stakers(dlp1Owner)).should.eq(parseEther('0'));
+      (await dlpRoot.stakedDlps(dlp1Owner, 1)).should.eq(parseEther('0'));
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + parseEther('100'));
       (await ethers.provider.getBalance(dlpRoot)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
@@ -1767,7 +1788,7 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch1Rewards.scores.should.deep.eq([parseEther('0.25'), parseEther('0.75')]);
       epoch1Rewards.withdrawnAmounts.should.deep.eq([parseEther('0'), parseEther('0')]);
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       const dlp1OwnerInitialBalance = await ethers.provider.getBalance(dlp1Owner);
       const dlp2OwnerInitialBalance = await ethers.provider.getBalance(dlp2Owner);
@@ -1779,14 +1800,14 @@ describe("DataLiquidityPoolsRoot", () => {
         .emit(dlpRoot, 'EpochRewardClaimed')
         .withArgs(dlp1, 1, (parseEther('0.25') * epochRewardAmount / parseEther('1')));
 
-        const epoch1RewardsAfter = await dlpRoot.epochRewards(1);
-        epoch1RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
-        epoch1RewardsAfter.scores.should.deep.eq([parseEther('0.25'), parseEther('0.75')]);
-        epoch1RewardsAfter.withdrawnAmounts.should.deep.eq([
-          (parseEther('0.25') * epochRewardAmount / parseEther('1')), 
-          0n
-        ]);
-      
+      const epoch1RewardsAfter = await dlpRoot.epochRewards(1);
+      epoch1RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
+      epoch1RewardsAfter.scores.should.deep.eq([parseEther('0.25'), parseEther('0.75')]);
+      epoch1RewardsAfter.withdrawnAmounts.should.deep.eq([
+        (parseEther('0.25') * epochRewardAmount / parseEther('1')),
+        0n
+      ]);
+
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + (parseEther('0.25') * epochRewardAmount / parseEther('1')) - BigInt(receipt.gasUsed * tx.gasPrice));
       (await ethers.provider.getBalance(dlp2Owner)).should.eq(dlp2OwnerInitialBalance);
@@ -1828,7 +1849,7 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2Rewards.scores.should.deep.eq([parseEther('0.6'), parseEther('0.4')]);
       epoch2Rewards.withdrawnAmounts.should.deep.eq([parseEther('0'), parseEther('0')]);
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       const dlp1OwnerInitialBalance = await ethers.provider.getBalance(dlp1Owner);
       const dlp2OwnerInitialBalance = await ethers.provider.getBalance(dlp2Owner);
@@ -1847,22 +1868,22 @@ describe("DataLiquidityPoolsRoot", () => {
         .emit(dlpRoot, 'EpochRewardClaimed')
         .withArgs(dlp2, 2, (parseEther('0.4') * epochRewardAmount * 3n / parseEther('1')));
 
-        const epoch1RewardsAfter = await dlpRoot.epochRewards(1);
-        epoch1RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
-        epoch1RewardsAfter.scores.should.deep.eq([parseEther('0.25'), parseEther('0.75')]);
-        epoch1RewardsAfter.withdrawnAmounts.should.deep.eq([
-          (parseEther('0.25') * epochRewardAmount / parseEther('1')), 
-          0n
-        ]);
+      const epoch1RewardsAfter = await dlpRoot.epochRewards(1);
+      epoch1RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
+      epoch1RewardsAfter.scores.should.deep.eq([parseEther('0.25'), parseEther('0.75')]);
+      epoch1RewardsAfter.withdrawnAmounts.should.deep.eq([
+        (parseEther('0.25') * epochRewardAmount / parseEther('1')),
+        0n
+      ]);
 
-        const epoch2RewardsAfter = await dlpRoot.epochRewards(2);
-        epoch2RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
-        epoch2RewardsAfter.scores.should.deep.eq([parseEther('0.6'), parseEther('0.4')]);
-        epoch2RewardsAfter.withdrawnAmounts.should.deep.eq([
-          0, 
-          (parseEther('0.4') * epochRewardAmount * 3n / parseEther('1'))
-        ]);
-      
+      const epoch2RewardsAfter = await dlpRoot.epochRewards(2);
+      epoch2RewardsAfter.dlps.should.deep.eq([dlp1.address, dlp2.address]);
+      epoch2RewardsAfter.scores.should.deep.eq([parseEther('0.6'), parseEther('0.4')]);
+      epoch2RewardsAfter.withdrawnAmounts.should.deep.eq([
+        0,
+        (parseEther('0.4') * epochRewardAmount * 3n / parseEther('1'))
+      ]);
+
 
       (await ethers.provider.getBalance(dlp1Owner)).should.eq(dlp1OwnerInitialBalance + (parseEther('0.25') * epochRewardAmount / parseEther('1')) - BigInt(receipt1.gasUsed * tx1.gasPrice));
       (await ethers.provider.getBalance(dlp2Owner)).should.eq(dlp2OwnerInitialBalance + (parseEther('0.4') * epochRewardAmount * 3n / parseEther('1')) - BigInt(receipt2.gasUsed * tx2.gasPrice));
@@ -1882,7 +1903,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await dlpRoot.createEpochs();
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       await dlpRoot.connect(dlp1Owner).claimUnsentReward(dlp1, 1);
 
@@ -1901,7 +1922,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await advanceToEpochN(2);
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       await dlpRoot.createEpochs();
 
@@ -1922,7 +1943,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await dlpRoot.createEpochs();
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       await dlpRoot.connect(dlp1Owner).claimUnsentReward(dlp1, 2).should.be.rejectedWith('NothingToClaim()');
     });
@@ -1943,7 +1964,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await dlpRoot.createEpochs();
 
-      await dlpRoot.addRewardForDlps({value: parseEther('100')});
+      await dlpRoot.addRewardForDlps({ value: parseEther('100') });
 
       await dlpRoot.connect(dlp1Owner).claimUnsentReward(dlp1, 1).should.be.rejectedWith('NothingToClaim()');
     });

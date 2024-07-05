@@ -29,7 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const startBlock: number = await getCurrentBlockNumber();
 	const rewardAmount = parseEther('10');
 	const fileRewardFactor = parseEther('5');
-	const fileRewardDelay = 3600 * 24 * 3;
+	const fileRewardDelay = 0; //3600 * 24 * 3;
 
 	const dlpDeploy = await upgrades.deployProxy(
 		await ethers.getContractFactory("DataLiquidityPool"),

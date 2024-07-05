@@ -2058,7 +2058,7 @@ describe("DataLiquidityPool", () => {
     });
 
 
-    it.only("should get nextFileToVerify based on last finalized file", async function () {
+    it("should get nextFileToVerify based on last finalized file", async function () {
       await registerValidators();
 
       await dlp.connect(user1).addFile('file1URL', "file1EncryptedAddress");
