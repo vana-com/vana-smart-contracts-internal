@@ -27,7 +27,7 @@ contract DataLiquidityPool is
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Triggered when a validator has staked some DAT
+     * @notice Triggered when a validator has staked some VANA
      *
      * @param validatorAddress                   address of the validator
      * @param amount                             amount staked in this call
@@ -36,7 +36,7 @@ contract DataLiquidityPool is
     event Staked(address indexed validatorAddress, uint256 amount, uint256 totalAmount);
 
     /**
-     * @notice Triggered when a validator has unstaked some DAT
+     * @notice Triggered when a validator has unstaked some VANA
      *
      * @param stakerAddress                      address of the staker
      * @param amount                             amount unstaked
