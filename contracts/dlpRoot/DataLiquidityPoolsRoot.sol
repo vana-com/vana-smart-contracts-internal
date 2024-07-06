@@ -27,7 +27,7 @@ contract DataLiquidityPoolsRoot is
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Triggered when a dlp has staked some DAT
+     * @notice Triggered when a dlp has staked some VANA
      *
      * @param dlpAddress                   address of the dlp
      * @param amount                             amount staked in this call
@@ -39,7 +39,7 @@ contract DataLiquidityPoolsRoot is
         uint256 totalAmount
     );
     /**
-     * @notice Triggered when a dlp has unstaked some DAT
+     * @notice Triggered when a dlp has unstaked some VANA
      *
      * @param stakerAddress                      address of the staker
      * @param amount                             amount unstaked
