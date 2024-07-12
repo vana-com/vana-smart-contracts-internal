@@ -2,7 +2,6 @@ import { ethers, upgrades } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { parseEther } from "ethers";
-import { env } from "process";
 import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

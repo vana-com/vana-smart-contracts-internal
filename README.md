@@ -30,7 +30,7 @@ DLP_TOKEN_SYMBOL=CUSTOMDAT
 npx hardhat deploy --network satori --tags DLPRootDeploy
 ```
 
-This will deploy the `DataLiquidityPoolsRoot` smart contract using the recommended params for testing. If you need a different setup, you can change them in the deploy/dlpRoot.ts script.
+This will deploy the `DataLiquidityPoolsRoot` smart contract using the recommended params for testing. If you need a different setup, you can change them in the deploy/root.ts script.
 
 7. Verify the `DataLiquidityPoolsRoot` contract:
 

@@ -2,9 +2,9 @@ import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
 import { BigNumberish, parseEther } from "ethers";
-import { DLPT, DataLiquidityPool } from "../typechain-types";
+import { DAT, DataLiquidityPool } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { advanceBlockNTimes, advanceNSeconds, advanceTimeAndBlock, advanceToBlockN, getCurrentBlockNumber, getCurrentBlockTimestamp } from "../utils/timeAndBlockManipulation";
+import { advanceBlockNTimes, advanceNSeconds, advanceToBlockN, getCurrentBlockNumber, getCurrentBlockTimestamp } from "../utils/timeAndBlockManipulation";
 
 chai.use(chaiAsPromised);
 should();
@@ -46,7 +46,7 @@ describe("DataLiquidityPool", () => {
   let user15: HardhatEthersSigner;
 
   let dlp: DataLiquidityPool;
-  let dlpt: DLPT;
+  let dat: DAT;
 
   const dlpName = "Test DLP";
   const dlpTokenName = "Test Data Autonomy Token";
@@ -79,8 +79,8 @@ describe("DataLiquidityPool", () => {
       user1, user2, user3, user4, user5, user6, user7, user8, user9, user10, user11, user12, user13, user14, user15
     ] = await ethers.getSigners();
 
-    const dlptDeploy = await ethers.deployContract("DLPT", [dlpTokenName, dlpTokenSymbol, owner]);
-    dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
+    const datDeploy = await ethers.deployContract("DAT", [dlpTokenName, dlpTokenSymbol, owner]);
+    dat = await ethers.getContractAt("DAT", datDeploy.target);
 
     startBlock = await getCurrentBlockNumber() + 1;
 
@@ -89,7 +89,7 @@ describe("DataLiquidityPool", () => {
       [[
         dlpName,
         owner.address,
-        dlpt.target,
+        dat.target,
         maxNumberOfValidators,
         validatorScoreMinTrust,
         validatorScoreKappa,
@@ -109,14 +109,14 @@ describe("DataLiquidityPool", () => {
 
     dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
 
-    await dlpt.connect(owner).mint(dlp, dlpInitialBalance);
-    await dlpt.connect(owner).mint(v1Owner, v1OwnerInitialBalance);
-    await dlpt.connect(owner).mint(v2Owner, v2OwnerInitialBalance);
-    await dlpt.connect(owner).mint(v3Owner, v3OwnerInitialBalance);
-    await dlpt.connect(owner).mint(v4Owner, v4OwnerInitialBalance);
-    await dlpt.connect(owner).mint(v5Owner, v5OwnerInitialBalance);
-    await dlpt.connect(owner).mint(owner, ownerInitialBalance);
-    await dlpt.connect(owner).mint(user1, user1InitialBalance);
+    await dat.connect(owner).mint(dlp, dlpInitialBalance);
+    await dat.connect(owner).mint(v1Owner, v1OwnerInitialBalance);
+    await dat.connect(owner).mint(v2Owner, v2OwnerInitialBalance);
+    await dat.connect(owner).mint(v3Owner, v3OwnerInitialBalance);
+    await dat.connect(owner).mint(v4Owner, v4OwnerInitialBalance);
+    await dat.connect(owner).mint(v5Owner, v5OwnerInitialBalance);
+    await dat.connect(owner).mint(owner, ownerInitialBalance);
+    await dat.connect(owner).mint(user1, user1InitialBalance);
   }
 
   async function advanceToEpochN(epochNumber: number) {
@@ -127,11 +127,11 @@ describe("DataLiquidityPool", () => {
   }
 
   async function registerValidators() {
-    await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-    await dlpt.connect(v2Owner).approve(dlp, parseEther('100'));
-    await dlpt.connect(v3Owner).approve(dlp, parseEther('100'));
-    await dlpt.connect(v4Owner).approve(dlp, parseEther('100'));
-    await dlpt.connect(v5Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v2Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v3Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v4Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v5Owner).approve(dlp, parseEther('100'));
     await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
     await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('100'));
     await dlp.connect(v3Owner).registerValidator(v3, v3Owner, parseEther('100'));
@@ -144,7 +144,7 @@ describe("DataLiquidityPool", () => {
   }
 
   async function registerValidator1() {
-    await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+    await dat.connect(v1Owner).approve(dlp, parseEther('100'));
     await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
     await dlp.connect(owner).approveValidator(v1);
 
@@ -531,8 +531,8 @@ describe("DataLiquidityPool", () => {
     it("should createEpochs when updating weights #1", async function () {
       await advanceToEpochN(3);
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
@@ -558,8 +558,8 @@ describe("DataLiquidityPool", () => {
     it("should createEpochs when updating weights #2", async function () {
       await advanceToEpochN(3);
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
@@ -586,8 +586,8 @@ describe("DataLiquidityPool", () => {
 
       await dlp.connect(owner).updateMinStakeAmount(0);
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
@@ -901,7 +901,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should registerValidator", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'))
         .should.emit(dlp, 'ValidatorRegistered')
         .withArgs(v1.address, v1Owner.address, parseEther('100'));
@@ -927,12 +927,12 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
     });
 
     it("should registerValidator as sponsor", async function () {
-      await dlpt.connect(user1).approve(dlp, parseEther('100'));
+      await dat.connect(user1).approve(dlp, parseEther('100'));
       await dlp.connect(user1).registerValidator(v1, v1Owner, parseEther('100'))
         .should.emit(dlp, 'ValidatorRegistered')
         .withArgs(v1.address, v1Owner.address, parseEther('100'));
@@ -958,13 +958,13 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(user1)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(user1)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
     });
 
 
     it("should registerValidator as DLP owner", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'))
         .should.emit(dlp, 'ValidatorRegistered')
         .withArgs(v1.address, v1Owner.address, parseEther('100'));
@@ -990,14 +990,14 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
     });
 
     it("should registerValidator many times", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v3Owner).approve(dlp, parseEther('300'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v3Owner).approve(dlp, parseEther('300'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'))
         .should.emit(dlp, 'ValidatorRegistered')
         .withArgs(v1.address, v1Owner.address, parseEther('100'));
@@ -1050,14 +1050,14 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100') + parseEther('200') + parseEther('300'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v2Owner)).should.eq(v2OwnerInitialBalance - parseEther('200'));
-      (await dlpt.balanceOf(v3Owner)).should.eq(v3OwnerInitialBalance - parseEther('300'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100') + parseEther('200') + parseEther('300'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v2Owner)).should.eq(v2OwnerInitialBalance - parseEther('200'));
+      (await dat.balanceOf(v3Owner)).should.eq(v3OwnerInitialBalance - parseEther('300'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100') + parseEther('200') + parseEther('300'));
     });
 
     it("Should reject registerValidator when stake amount too small", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('1'))
         .should.be.rejectedWith(
           `InvalidStakeAmount()`
@@ -1065,7 +1065,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("Should reject registerValidator when already registered", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'))
         .should.be.rejectedWith(
@@ -1082,7 +1082,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("Should reject registerValidator when deregistered", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('200'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
       await dlp.connect(v1Owner).deregisterValidator(v1);
@@ -1093,7 +1093,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("Should reject registerValidator when deregistered", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('200'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
       await dlp.connect(v1Owner).deregisterValidator(v1);
@@ -1104,7 +1104,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should approveValidator when owner", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1)
         .should.emit(dlp, 'ValidatorApproved')
@@ -1126,11 +1126,11 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should approve many validators", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v3Owner).approve(dlp, parseEther('300'));
-      await dlpt.connect(v4Owner).approve(dlp, parseEther('400'));
-      await dlpt.connect(v5Owner).approve(dlp, parseEther('500'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v3Owner).approve(dlp, parseEther('300'));
+      await dat.connect(v4Owner).approve(dlp, parseEther('400'));
+      await dat.connect(v5Owner).approve(dlp, parseEther('500'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('200'));
       await dlp.connect(v3Owner).registerValidator(v3, v3Owner, parseEther('300'));
@@ -1188,7 +1188,7 @@ describe("DataLiquidityPool", () => {
     });
 
     it("Should reject approveValidator when non-owner", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v1Owner).approveValidator(v1)
         .should.be.rejectedWith(
@@ -1223,7 +1223,7 @@ describe("DataLiquidityPool", () => {
     it("should createEpochs when approving validators", async function () {
       await advanceToEpochN(4);
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100')).should.be.fulfilled
 
       await dlp.connect(owner).approveValidator(v1).should
@@ -1256,11 +1256,11 @@ describe("DataLiquidityPool", () => {
     it("should approve validators in separate epochs", async function () {
       await advanceToEpochN(2);
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v3Owner).approve(dlp, parseEther('300'));
-      await dlpt.connect(v4Owner).approve(dlp, parseEther('400'));
-      await dlpt.connect(v5Owner).approve(dlp, parseEther('500'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v3Owner).approve(dlp, parseEther('300'));
+      await dat.connect(v4Owner).approve(dlp, parseEther('400'));
+      await dat.connect(v5Owner).approve(dlp, parseEther('500'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100')).should.be.fulfilled
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('200')).should.be.fulfilled
       await dlp.connect(v3Owner).registerValidator(v3, v3Owner, parseEther('300')).should.be.fulfilled
@@ -1344,12 +1344,12 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address)
-        .emit(dlpt, 'Transfer').withArgs(dlp, v1Owner, parseEther('100'));
+        .emit(dat, 'Transfer').withArgs(dlp, v1Owner, parseEther('100'));
 
       const validator1 = await dlp.validatorsInfo(v1);
       validator1.status.should.eq(ValidatorStatus.Deregistered);
@@ -1368,20 +1368,20 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(0);
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
     it("should deregisterValidator when granted", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address);
@@ -1404,9 +1404,9 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
     });
 
     it("Should reject deregisterValidator when non validator owner", async function () {
@@ -1436,8 +1436,8 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(5n * parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
 
       const currentBlockNumber = await getCurrentBlockNumber();
 
@@ -1486,8 +1486,8 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(4n * parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
     });
 
     it("should deregisterValidator when validator owner #multiple validators 2", async function () {
@@ -1544,13 +1544,13 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('100')).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address)
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('100'), parseEther('0'))
-        .emit(dlpt, 'Transfer').withArgs(dlp, v1Owner, parseEther('100'));
+        .emit(dat, 'Transfer').withArgs(dlp, v1Owner, parseEther('100'));
 
       const validator1 = await dlp.validatorsInfo(v1);
       validator1.status.should.eq(ValidatorStatus.Deregistered);
@@ -1569,20 +1569,20 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(0);
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
     it("should deregisterValidatorByOwner when granted #full unstake amount", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('100')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('100'), parseEther('0'))
@@ -1606,21 +1606,21 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
     it("should deregisterValidatorByOwner when granted #partial unstake amount", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('40')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('40'), parseEther('60'))
@@ -1644,21 +1644,21 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('40'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('40'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
     it("should deregisterValidatorByOwner when granted #no unstake amount", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(owner).deregisterValidatorByOwner(v1, parseEther('0')).should
         .emit(dlp, 'ValidatorDeregisteredByOwner').withArgs(v1.address, parseEther('0'), parseEther('100'))
@@ -1682,21 +1682,21 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance);
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance);
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
     it("should deregisterValidatorByOwner when granted and deregistered", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(owner).approveValidator(v1);
 
       (await dlp.totalStaked()).should.eq(parseEther('100'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + parseEther('100'));
 
       await dlp.connect(v1Owner).deregisterValidator(v1).should
         .emit(dlp, 'ValidatorDeregistered').withArgs(v1.address);
@@ -1722,9 +1722,9 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(parseEther('0'));
 
-      (await dlpt.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('40'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance);
+      (await dat.balanceOf(owner)).should.eq(ownerInitialBalance - parseEther('40'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance + parseEther('40'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance);
     });
 
 
@@ -1755,8 +1755,8 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(5n * parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance - parseEther('100'));
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + 5n * parseEther('100'));
 
       const currentBlockNumber = await getCurrentBlockNumber();
 
@@ -1805,8 +1805,8 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.totalStaked()).should.eq(4n * parseEther('100'));
 
-      (await dlpt.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
-      (await dlpt.balanceOf(dlp)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
+      (await dat.balanceOf(v1Owner)).should.eq(v1OwnerInitialBalance);
+      (await dat.balanceOf(dlp)).should.eq(dlpInitialBalance + 4n * parseEther('100'));
     });
 
     it("should deregisterValidatorByOwner when validator owner #multiple validators 2", async function () {
@@ -1967,9 +1967,9 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should updateWeights when validator", async function () {
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v3Owner).approve(dlp, parseEther('300'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v3Owner).approve(dlp, parseEther('300'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('200'));
       await dlp.connect(v3Owner).registerValidator(v3, v3Owner, parseEther('300'));
@@ -1988,14 +1988,14 @@ describe("DataLiquidityPool", () => {
     });
 
     it("should send rewards after the end of an epoch", async function () {
-      await dlpt.connect(owner).approve(dlp, parseEther('100'));
+      await dat.connect(owner).approve(dlp, parseEther('100'));
       await dlp.connect(owner).addRewardForValidators(parseEther('100'));
 
-      await dlpt.connect(v1Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v2Owner).approve(dlp, parseEther('100'));
-      await dlpt.connect(v3Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v4Owner).approve(dlp, parseEther('200'));
-      await dlpt.connect(v5Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v1Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v2Owner).approve(dlp, parseEther('100'));
+      await dat.connect(v3Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v4Owner).approve(dlp, parseEther('200'));
+      await dat.connect(v5Owner).approve(dlp, parseEther('200'));
       await dlp.connect(v1Owner).registerValidator(v1, v1Owner, parseEther('100'));
       await dlp.connect(v2Owner).registerValidator(v2, v2Owner, parseEther('100'));
       await dlp.connect(v3Owner).registerValidator(v3, v3Owner, parseEther('200'));
@@ -2023,20 +2023,20 @@ describe("DataLiquidityPool", () => {
 
       emissionScore.should.deep.eq([v1ExpectedEmissionScore, v2ExpectedEmissionScore, v3ExpectedEmissionScore, v4ExpectedEmissionScore, v5ExpectedEmissionScore]);
 
-      const initialV1Balance = await dlpt.balanceOf(v1Owner);
-      const initialV2Balance = await dlpt.balanceOf(v2Owner);
-      const initialV3Balance = await dlpt.balanceOf(v3Owner);
-      const initialV4Balance = await dlpt.balanceOf(v4Owner);
-      const initialV5Balance = await dlpt.balanceOf(v5Owner);
+      const initialV1Balance = await dat.balanceOf(v1Owner);
+      const initialV2Balance = await dat.balanceOf(v2Owner);
+      const initialV3Balance = await dat.balanceOf(v3Owner);
+      const initialV4Balance = await dat.balanceOf(v4Owner);
+      const initialV5Balance = await dat.balanceOf(v5Owner);
 
       await advanceBlockNTimes(epochSize + 1);
       await dlp.connect(owner).createEpochs();
 
-      const finaleV1Balance = await dlpt.balanceOf(v1Owner);
-      const finaleV2Balance = await dlpt.balanceOf(v2Owner);
-      const finaleV3Balance = await dlpt.balanceOf(v3Owner);
-      const finaleV4Balance = await dlpt.balanceOf(v4Owner);
-      const finaleV5Balance = await dlpt.balanceOf(v5Owner);
+      const finaleV1Balance = await dat.balanceOf(v1Owner);
+      const finaleV2Balance = await dat.balanceOf(v2Owner);
+      const finaleV3Balance = await dat.balanceOf(v3Owner);
+      const finaleV4Balance = await dat.balanceOf(v4Owner);
+      const finaleV5Balance = await dat.balanceOf(v5Owner);
 
       const epoch1Rewards = await dlp.epochRewards(1);
       epoch1Rewards.validators.should.deep.eq([v1.address, v2.address, v3.address, v4.address, v5.address]);
@@ -2085,7 +2085,7 @@ describe("DataLiquidityPool", () => {
     beforeEach(async () => {
       await deploy();
 
-      await dlpt.connect(owner).approve(dlp, parseEther('10000'));
+      await dat.connect(owner).approve(dlp, parseEther('10000'));
       await dlp.connect(owner).addRewardsForContributors(parseEther('10000'));
     });
 
@@ -2129,10 +2129,10 @@ describe("DataLiquidityPool", () => {
 
       await advanceNSeconds(fileRewardDelay);
 
-      const user1InitialBalance = await dlpt.balanceOf(user1.address);
+      const user1InitialBalance = await dat.balanceOf(user1.address);
       await dlp.connect(user1).claimContributionReward(1)
         .should.emit(dlp, 'ContributionRewardClaimed').withArgs(user1.address, 1, expectedReward);
-      const user1FinalBalance = await dlpt.balanceOf(user1.address);
+      const user1FinalBalance = await dat.balanceOf(user1.address);
 
       (user1FinalBalance - user1InitialBalance).should.eq(expectedReward);
     });
@@ -2176,7 +2176,7 @@ describe("DataLiquidityPool", () => {
     }
 
     async function registerAndApproveValidator(validatorOwner: HardhatEthersSigner, validator: HardhatEthersSigner, stakeAmount: BigNumberish) {
-      await dlpt.connect(validatorOwner).approve(dlp, stakeAmount);
+      await dat.connect(validatorOwner).approve(dlp, stakeAmount);
       await dlp.connect(validatorOwner).registerValidator(validator, v1Owner, stakeAmount);
       await dlp.connect(owner).approveValidator(validator);
     }
@@ -2252,7 +2252,7 @@ describe("DataLiquidityPool", () => {
 
     scenarios.forEach(scenario => {
       it(scenario.description, async function () {
-        await dlpt.connect(owner).approve(dlp, parseEther('1000'));
+        await dat.connect(owner).approve(dlp, parseEther('1000'));
         await dlp.connect(owner).addRewardForValidators(parseEther('1000'));
         await setupScenario(parseEtherArray(scenario.stakes), scenario.weights.map(weightRow => parseEtherArray(weightRow)));
         await expectEmissionScores(1, parseEtherArray(scenario.expectedScores));

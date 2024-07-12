@@ -14,10 +14,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 	const tokenName = process.env.DLP_TOKEN_NAME ?? "Custom Data Autonomy Token";
 	const tokenSymbol = process.env.DLP_TOKEN_SYMBOL ?? "CUSTOMDAT";
 
-	const dlptDeploy = await ethers.deployContract("DLPT", [tokenName, tokenSymbol, ownerAddress]);
-	const dlpt = await ethers.getContractAt("DLPT", dlptDeploy.target);
+	const datDeploy = await ethers.deployContract("DAT", [tokenName, tokenSymbol, ownerAddress]);
+	const dat = await ethers.getContractAt("DAT", datDeploy.target);
 
-	console.log("DataLiquidityPoolToken deployed at:", dlptDeploy.target);
+	console.log("DataLiquidityPoolToken deployed at:", datDeploy.target);
 
 	const maxNumberOfValidators = 3;
 	const validatorScoreMinTrust = parseEther('0.1');
@@ -36,7 +36,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 		[{
 			name: dlpName,
 			ownerAddress,
-			tokenAddress: dlptDeploy.target,
+			tokenAddress: datDeploy.target,
 			newMaxNumberOfValidators: maxNumberOfValidators,
 			newValidatorScoreMinTrust: validatorScoreMinTrust,
 			newValidatorScoreKappa: validatorScoreKappa,
@@ -59,14 +59,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 	await new Promise((resolve) => setTimeout(resolve, 10000));
 
-	await dlpt.connect(deployer).mint(deployer.address, parseEther('10000000'));
+	await dat.connect(deployer).mint(deployer.address, parseEther('10000000'));
 
-	await dlpt.connect(deployer).approve(dlp, parseEther('3000000'));
+	await dat.connect(deployer).approve(dlp, parseEther('3000000'));
 	await dlp.connect(deployer).addRewardForValidators(parseEther('2000000'));
 	await dlp.connect(deployer).addRewardsForContributors(parseEther('1000000'));
-	await dlpt.connect(deployer).transfer(ownerAddress, parseEther('7000000'));
+	await dat.connect(deployer).transfer(ownerAddress, parseEther('7000000'));
 
-	await dlpt.transferOwnership(ownerAddress);
+	await dat.transferOwnership(ownerAddress);
 	await dlp.transferOwnership(ownerAddress);
 };
 
