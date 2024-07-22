@@ -93,11 +93,9 @@ interface IDataLiquidityPool is IAccessControl {
     }
 
     function epochs(uint256 epochId) external view returns (EpochResponse memory);
-    function epochRewards(uint256 epochId) external view returns (
-        address[] memory validators,
-        uint256[] memory scores,
-        uint256[] memory withdrawnAmounts
-    );
+    function epochRewards(
+        uint256 epochId
+    ) external view returns (address[] memory validators, uint256[] memory scores, uint256[] memory withdrawnAmounts);
     function minStakeAmount() external view returns (uint256);
     function totalStaked() external view returns (uint256);
     function totalValidatorsRewardAmount() external view returns (uint256);
@@ -145,7 +143,9 @@ interface IDataLiquidityPool is IAccessControl {
 
     function validators(uint256 index) external view returns (ValidatorInfoResponse memory);
     function validatorsInfo(address validatorAddress) external view returns (ValidatorInfoResponse memory);
-    function validatorWeights(address validatorAddress) external view returns (address[] memory validators, uint256[] memory weights);
+    function validatorWeights(
+        address validatorAddress
+    ) external view returns (address[] memory validators, uint256[] memory weights);
     function fileScores(uint256 fileId, address validatorAddress) external view returns (FileScore memory);
     function contributorsCount() external view returns (uint256);
 
@@ -178,7 +178,15 @@ interface IDataLiquidityPool is IAccessControl {
     function deregisterValidatorByOwner(address validatorAddress, uint256 unstakeAmount) external;
     function setMasterKey(string memory newMasterKey) external;
     function addFile(string memory url, string memory encryptedKey) external;
-    function verifyFile(uint256 fileId, bool valid, uint256 score, uint256 authenticity, uint256 ownership, uint256 quality, uint256 uniqueness) external;
+    function verifyFile(
+        uint256 fileId,
+        bool valid,
+        uint256 score,
+        uint256 authenticity,
+        uint256 ownership,
+        uint256 quality,
+        uint256 uniqueness
+    ) external;
     function updateWeights(address[] memory validators, uint256[] memory weights) external;
     function addRewardForValidators(uint256 validatorsRewardAmount) external;
     function addRewardsForContributors(uint256 contributorsRewardAmount) external;

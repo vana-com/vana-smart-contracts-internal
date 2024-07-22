@@ -8,7 +8,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
+contract DATV2Mock is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     address public admin;

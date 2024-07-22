@@ -10,15 +10,13 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/DataLiquidityPoolsRootStorageV1.sol";
 
-import "hardhat/console.sol";
-
 contract DataLiquidityPoolsRoot is
-UUPSUpgradeable,
-PausableUpgradeable,
-Ownable2StepUpgradeable,
-AccessControlUpgradeable,
-ReentrancyGuardUpgradeable,
-DataLiquidityPoolsRootStorageV1
+    UUPSUpgradeable,
+    PausableUpgradeable,
+    Ownable2StepUpgradeable,
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    DataLiquidityPoolsRootStorageV1
 {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -33,11 +31,7 @@ DataLiquidityPoolsRootStorageV1
      * @param dlpAddress                   address of the dlp
      * @param ownerAddress                 owner of the dlp
      */
-    event DlpRegistered(
-        uint256 indexed dlpId,
-        address indexed dlpAddress,
-        address indexed ownerAddress
-    );
+    event DlpRegistered(uint256 indexed dlpId, address indexed dlpAddress, address indexed ownerAddress);
 
     /**
      * @notice Triggered when a dlp has been deregistered
@@ -53,12 +47,7 @@ DataLiquidityPoolsRootStorageV1
      * @param unstakedAmount                     amount unstaked
      * @param penaltyAmount                      penalty amount
      */
-    event DlpDeregisteredByOwner(
-        uint256 indexed dlpId,
-        uint256 unstakedAmount
-    ,
-        uint256 penaltyAmount
-    );
+    event DlpDeregisteredByOwner(uint256 indexed dlpId, uint256 unstakedAmount, uint256 penaltyAmount);
 
     /**
      * @notice Triggered when a epoch has been created
@@ -106,11 +95,12 @@ DataLiquidityPoolsRootStorageV1
     /**
      * @notice Triggered when a dlp has claimed un unsent reward
      *
-     * @param dlpId                               id of the dlp
+     * @param staker                              address of the staker
      * @param epochId                             epoch id
+     * @param dlpId                               id of the dlp
      * @param claimAmount                         amount claimed
      */
-    event EpochRewardClaimed(uint256 dlpId, uint256 epochId, uint256 claimAmount);
+    event EpochRewardClaimed(address staker, uint256 epochId, uint256 dlpId, uint256 claimAmount);
 
     /**
      * @notice Triggered when user has staked some DAT for a DLP
@@ -128,22 +118,27 @@ DataLiquidityPoolsRootStorageV1
      * @param dlpId                             id of the dlp
      * @param amount                            amount unstaked
      */
-    event Unstaked(
-        address indexed staker,
-        uint256 indexed dlpId,
-        uint256 amount
-    );
+    event Unstaked(address indexed staker, uint256 indexed dlpId, uint256 amount);
+
+    /**
+     * @notice Triggered when epoch performances have been saved
+     *
+     * @param epochId                         epoch id
+     */
+    event EpochPerformancesSaved(uint256 epochId);
 
     error InvalidStakeAmount();
+    error InvalidUnstakeAmount();
     error InvalidDlpStatus();
     error TooManyDlps();
     error NotDlpOwner();
     error WithdrawNotAllowed();
     error ArityMismatch();
     error NotAllowed();
-    error InvalidScores();
+    error InvalidPerformances();
     error NothingToClaim();
     error CurrentEpochNotInitialized();
+    error EpochPerformancesAlreadySet();
 
     /**
      * @dev Modifier to make a function callable only when the caller is the owner of the dlp
@@ -157,8 +152,8 @@ DataLiquidityPoolsRootStorageV1
         _;
     }
 
-    modifier whenCurrentEpochIsInitialized() {
-        if (_epochs[epochsCount].endBlock > block.number) {
+    modifier whenActiveCurrentEpoch() {
+        if (_epochs[epochsCount].endBlock < block.number) {
             revert CurrentEpochNotInitialized();
         }
         _;
@@ -203,14 +198,12 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param newImplementation                  new implementation
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     /**
-     * return the veriosn of the contract
+     * return the version of the contract
      */
-    function version() external pure override returns (uint256) {
+    function version() external pure virtual override returns (uint256) {
         return 1;
     }
 
@@ -219,33 +212,19 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param dlpId                         id of the dlp
      */
-    function dlps(
-        uint256 dlpId
-    ) public view override returns (DlpResponse memory) {
+    function dlps(uint256 dlpId) public view override returns (DlpResponse memory) {
         Dlp memory dlp = _dlps[dlpId];
 
-        uint256 id;
-        address dlpAddress;
-        address ownerAddress;
-        uint256 stakeAmount;
-        DlpStatus status;
-        uint256 firstBlockNumber;
-        uint256 lastBlockNumber;
-        uint256 grantedAmount;
-        uint256 score;
-
-        return DlpResponse({
-            id: _dlps[dlpId].id,
-            dlpAddress: _dlps[dlpId].dlpAddress,
-            ownerAddress: _dlps[dlpId].ownerAddress,
-            stakeAmount: _dlps[dlpId].stakeAmount,
-            status: _dlps[dlpId].status,
-            firstBlockNumber
-            : _dlps[dlpId].firstBlockNumber,
-            lastBlockNumber: _dlps[dlpId].lastBlockNumber,
-            grantedAmount: _dlps[dlpId].grantedAmount,
-            score: _dlps[dlpId].score
-        });
+        return
+            DlpResponse({
+                id: dlp.id,
+                dlpAddress: dlp.dlpAddress,
+                ownerAddress: dlp.ownerAddress,
+                stakeAmount: dlp.stakeAmount,
+                status: dlp.status,
+                registrationBlockNumber: dlp.registrationBlockNumber,
+                grantedAmount: dlp.grantedAmount
+            });
     }
 
     /**
@@ -253,16 +232,14 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param dlpAddress                         address of the dlp
      */
-    function dlpsByAddress(
-        address dlpAddress
-    ) external view override returns (DlpResponse memory) {
+    function dlpsByAddress(address dlpAddress) external view override returns (DlpResponse memory) {
         return dlps(dlpIds[dlpAddress]);
     }
 
     /**
      * @notice Get registered dlps list
      */
-    function registeredDlps() public view override returns (uint256[] memory) {
+    function registeredDlps() external view override returns (uint256[] memory) {
         return _registeredDlps.values();
     }
 
@@ -271,85 +248,58 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param epochId                         epoch id
      */
-    function epochs(
-        uint256 epochId
-    ) external view override returns (EpochResponse memory) {
-        return EpochResponse({
-            startBlock: _epochs[epochId].startBlock,
-            endBlock: _epochs[epochId].endBlock,
-            reward: _epochs[epochId].reward,
-            dlpIds: _epochs[epochId].dlpIds.values()
-        });
+    function epochs(uint256 epochId) external view override returns (EpochResponse memory) {
+        return
+            EpochResponse({
+                startBlock: _epochs[epochId].startBlock,
+                endBlock: _epochs[epochId].endBlock,
+                reward: _epochs[epochId].reward,
+                dlpIds: _epochs[epochId].dlpIds.values()
+            });
     }
 
     /**
-     * @notice Get the epoch rewards
+     * @notice Get epoch dlp information
      *
-     * @param epochId                              epoch id
-     *
-     * @return dlpIds                              dlp ids
-     * @return scores                              scores
-     * @return withdrawnAmounts                    withdrawnAmounts
+     * @param epochId                         epoch id
+     * @param dlpId                           id of the dlp
      */
-    function epochRewards(
-        uint256 epochId
-    )
-    external
-    view
-    override
-    returns (
-        uint256[] memory dlpIds,
-        uint256[] memory scores,
-        uint256[] memory withdrawnAmounts
-    )
-    {
-        Epoch storage epoch = _epochs[epochId];
-        EnumerableSet.UintSet storage epochDlpIds = epoch.dlpIds;
-
-        uint256 epochDlpsCount = epochDlpIds.length();
-
-        dlpIds = new uint256[](epochDlpsCount);
-        scores = new uint256[](epochDlpsCount);
-        withdrawnAmounts = new uint256[](epochDlpsCount);
-
-
-        for (uint256 i = 0; i < epochDlpsCount; i++) {
-            dlpIds[i] = epochDlpIds.at(i);
-            scores[i] = epoch.dlps[dlpIds[i]].score;
-            withdrawnAmounts[i] = epoch.dlps[dlpIds[i]].withdrawnAmount;
-        }
+    function epochDlps(uint256 epochId, uint256 dlpId) external view override returns (EpochDlp memory) {
+        return _epochs[epochId].dlps[dlpId];
     }
 
     /**
-     * @notice Get scores of all epoch dlps
+     * @notice Get the staker information
+     *
+     * @param staker                         address of the staker
      */
-    function dlpScores() external view override
-    returns (uint256[] memory dlpIds, uint256[] memory scores) {
-        Epoch storage epoch = _epochs[epochsCount];
-        EnumerableSet.UintSet storage epochDlpIds = epoch.dlpIds;
-
-        uint256 epochDlpsCount = epochDlpIds.length();
-
-        scores = new uint256[](epochDlpsCount);
-        dlpIds = new uint256[](epochDlpsCount);
-
-        for (uint256 i = 0; i < epochDlpsCount; i++) {
-            dlpIds[i] = epochDlpIds.at(i);
-            scores[i] = _dlps[i].score;
-        }
-    }
-
-    function stakers(
-        address staker
-    ) external view override returns (uint256 totalStaked) {
+    function stakers(address staker) external view override returns (uint256) {
         return _stakers[staker].totalStaked;
     }
 
-    function stakedDlps(
+    /**
+     * @notice Get the dlp stakers
+     *
+     * @param staker                        address of the staker
+     * @param dlpId                         id of the dlp
+     */
+    function stakerDlps(address staker, uint256 dlpId) external view override returns (uint256) {
+        return _stakers[staker].dlps[dlpId].stakedAmount;
+    }
+
+    /**
+     * @notice Get the staker epoch dlp
+     *
+     * @param staker                          address of the staker
+     * @param epochId                         epoch id
+     * @param dlpId                           id of the dlp
+     */
+    function stakerDlpEpochs(
         address staker,
-        uint256 dlpId
-    ) external view override returns (uint256 dlpStaked) {
-        return _stakers[staker].stakedDlps[dlpId];
+        uint256 dlpId,
+        uint256 epochId
+    ) external view override returns (StakerDlpEpoch memory) {
+        return _stakers[staker].dlps[dlpId].epochs[epochId];
     }
 
     /**
@@ -371,9 +321,7 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param newMaxNumberOfDlps           new maximum number of dlps
      */
-    function updateMaxNumberOfDlps(
-        uint256 newMaxNumberOfDlps
-    ) external override onlyOwner {
+    function updateMaxNumberOfDlps(uint256 newMaxNumberOfDlps) external override onlyOwner {
         maxNumberOfDlps = newMaxNumberOfDlps;
 
         emit MaxNumberOfDlpsUpdated(newMaxNumberOfDlps);
@@ -395,13 +343,9 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param newEpochRewardAmount                new epoch size
      */
-    function updateEpochRewardAmount(
-        uint256 newEpochRewardAmount
-    ) external override onlyOwner {
+    function updateEpochRewardAmount(uint256 newEpochRewardAmount) external override onlyOwner {
         createEpochs();
         epochRewardAmount = newEpochRewardAmount;
-
-        _epochs[epochsCount].reward = newEpochRewardAmount;
 
         emit EpochRewardAmountUpdated(newEpochRewardAmount);
     }
@@ -411,9 +355,7 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param newMinDlpStakeAmount                new minDlpStakeAmount
      */
-    function updateMinDlpStakeAmount(
-        uint256 newMinDlpStakeAmount
-    ) external override onlyOwner {
+    function updateMinDlpStakeAmount(uint256 newMinDlpStakeAmount) external override onlyOwner {
         minDlpStakeAmount = newMinDlpStakeAmount;
 
         emit MinDlpStakeAmountUpdated(newMinDlpStakeAmount);
@@ -430,7 +372,7 @@ DataLiquidityPoolsRootStorageV1
         address dlpAddress,
         address payable dlpOwnerAddress,
         bool granted
-    ) external payable override whenNotPaused nonReentrant {
+    ) external payable override whenNotPaused nonReentrant whenActiveCurrentEpoch {
         if (dlpIds[dlpAddress] != 0) {
             revert InvalidDlpStatus();
         }
@@ -465,26 +407,13 @@ DataLiquidityPoolsRootStorageV1
      *
      * @param dlpId                        dlp id
      */
-    function deregisterDlp(
-        uint256 dlpId
-    ) external override onlyDlpOwner(dlpId) nonReentrant {
+    function deregisterDlp(uint256 dlpId) external override onlyDlpOwner(dlpId) nonReentrant whenActiveCurrentEpoch {
         Dlp storage dlp = _dlps[dlpId];
-
-        if (
-            dlp.ownerAddress != msg.sender &&
-            msg.sender != owner()
-        ) {
-            revert NotAllowed();
-        }
 
         _deregisterDlp(dlpId);
 
         if (dlp.grantedAmount == 0) {
-            _unstake(
-                dlp.ownerAddress,
-                dlp.id,
-                _stakers[dlp.ownerAddress].stakedDlps[dlp.id]
-            );
+            _unstake(dlp.ownerAddress, dlp.id, _stakers[dlp.ownerAddress].dlps[dlpId].stakedAmount);
         }
     }
 
@@ -494,10 +423,8 @@ DataLiquidityPoolsRootStorageV1
      * @param dlpId                             dlp id
      * @param unstakeAmount                     amount to sent to dlp owner
      */
-    function deregisterDlpByOwner(
-        uint256 dlpId,
-        uint256 unstakeAmount
-    ) external override onlyOwner nonReentrant {
+    function deregisterDlpByOwner(uint256 dlpId, uint256 unstakeAmount) external override onlyOwner nonReentrant {
+        createEpochs();
         Dlp storage dlp = _dlps[dlpId];
 
         if (unstakeAmount > dlp.stakeAmount) {
@@ -514,13 +441,14 @@ DataLiquidityPoolsRootStorageV1
 
         uint256 penaltyAmount = dlp.stakeAmount - unstakeAmount;
 
-        StakerInfo storage _stakerInfo = _stakers[dlp.ownerAddress];
+        Staker storage staker = _stakers[dlp.ownerAddress];
 
-        uint256 ownerStakeAmount = _stakerInfo.stakedDlps[dlp.id];
+        uint256 ownerStakeAmount = staker.dlps[dlpId].stakedAmount;
         dlp.stakeAmount -= ownerStakeAmount;
 
-        _stakerInfo.totalStaked -= ownerStakeAmount;
-        _stakerInfo.stakedDlps[dlp.id] = 0;
+        staker.totalStaked -= ownerStakeAmount;
+        staker.dlps[dlp.id].stakedAmount = 0;
+        staker.dlps[dlp.id].epochs[epochsCount].stakedAmount = 0;
 
         if (penaltyAmount > 0) {
             payable(owner()).transfer(penaltyAmount);
@@ -556,7 +484,6 @@ DataLiquidityPoolsRootStorageV1
         uint256 epochCountTemp = epochsCount;
 
         while (lastEpoch.endBlock < blockNumber) {
-            _setEmissionScores(epochCountTemp);
             epochCountTemp++;
             Epoch storage newEpoch = _epochs[epochCountTemp];
 
@@ -566,6 +493,13 @@ DataLiquidityPoolsRootStorageV1
 
             lastEpoch = newEpoch;
 
+            uint256 index;
+            uint256[] memory topDlps = getTopDlpsIds(maxNumberOfDlps);
+            for (index = 0; index < topDlps.length; index++) {
+                newEpoch.dlpIds.add(topDlps[index]);
+                newEpoch.dlps[topDlps[index]].stakedAmount = _dlps[topDlps[index]].stakeAmount;
+            }
+
             emit EpochCreated(epochCountTemp);
         }
 
@@ -573,43 +507,74 @@ DataLiquidityPoolsRootStorageV1
     }
 
     /**
-     * @notice Set the scores for the dlps
+     * @notice Saves the performances of DLPs for a specific epoch
+     *
+     * @param epochId             The ID of the epoch
+     * @param dlpPerformances     An array of DLPPerformance structs containing the performance metrics of the DLPs
      */
-    function updateScores(
-        uint256[] memory dlps,
-        uint256[] memory scores
+    function saveEpochPerformances(
+        uint256 epochId,
+        DlpPerformance[] memory dlpPerformances
     ) external override onlyOwner {
-        createEpochs();
+        EnumerableSet.UintSet storage epochDlpIds = _epochs[epochId].dlpIds;
+        uint256 epochDlpsCount = epochDlpIds.length();
 
-        Epoch storage epoch = _epochs[epochsCount];
-        EnumerableSet.UintSet storage epochDlpIds = epoch.dlpIds;
-
-        uint256 length = dlps.length;
-
-        if (
-            length != scores.length ||
-            length != epochDlpIds.length()
-        ) {
+        if (epochDlpsCount != dlpPerformances.length) {
             revert ArityMismatch();
         }
 
-        uint256 totalScore = 0;
-        for (uint256 i = 0; i < length; i++) {
-            Dlp storage dlp = _dlps[dlps[i]];
+        uint256 i;
+        Epoch storage epoch = _epochs[epochId];
+        EpochDlp storage epochDlp;
 
-            if (!epochDlpIds.contains(dlp.id)) {
-                revert InvalidDlpStatus();
+        uint256 totalScore;
+        for (i = 0; i < epochDlpsCount; i++) {
+            epochDlp = epoch.dlps[dlpPerformances[i].dlpId];
+
+            if (!epochDlpIds.contains(dlpPerformances[i].dlpId)) {
+                revert InvalidPerformances();
             }
 
-            dlp.score = scores[i];
-            totalScore += scores[i];
+            epochDlp.ttf = dlpPerformances[i].ttf;
+            epochDlp.tfc = dlpPerformances[i].tfc;
+            epochDlp.vdu = dlpPerformances[i].vdu;
+            epochDlp.uw = dlpPerformances[i].uw;
+
+            totalScore +=
+                dlpPerformances[i].ttf *
+                15 +
+                dlpPerformances[i].tfc *
+                15 +
+                dlpPerformances[i].vdu *
+                50 +
+                dlpPerformances[i].uw *
+                20;
         }
 
-        if (totalScore != 1e18) {
-            revert InvalidScores();
+        if (totalScore == 0) {
+            return;
         }
 
-        emit ScoresUpdated(dlps, scores);
+        for (i = 0; i < epochDlpsCount; i++) {
+            epochDlp = epoch.dlps[dlpPerformances[i].dlpId];
+
+            if (epochDlp.rewardAmount > 0) {
+                revert EpochPerformancesAlreadySet();
+            }
+
+            epochDlp.rewardAmount =
+                ((dlpPerformances[i].ttf *
+                    15 +
+                    dlpPerformances[i].tfc *
+                    15 +
+                    dlpPerformances[i].vdu *
+                    50 +
+                    dlpPerformances[i].uw *
+                    20) * epoch.reward) /
+                totalScore;
+        }
+
+        emit EpochPerformancesSaved(epochId);
     }
 
     /**
@@ -619,36 +584,67 @@ DataLiquidityPoolsRootStorageV1
         totalDlpsRewardAmount += msg.value;
     }
 
-    function claimUnsentReward(
-        uint256
+    /**
+     * @notice Staker claim reward for a dlp in an epoch
+     *
+     * @param epochNumber                         epoch number
+     * @param dlpId                               dlp id
+     */
+    function claimReward(uint256 epochNumber, uint256 dlpId) external nonReentrant {
+        uint256 epochDlpReward = _epochs[epochNumber].dlps[dlpId].rewardAmount;
 
-        dlpId,
-        uint256 epochNumber
-    ) external onlyDlpOwner(dlpId) {
-        Epoch storage epoch = _epochs[epochNumber];
-        EpochDlp storage epochDlps = epoch.dlps[dlpId];
+        StakerDlp storage stakerDlp = _stakers[msg.sender].dlps[dlpId];
+        StakerDlpEpoch storage stakerDlpEpoch = stakerDlp.epochs[epochNumber];
 
-        Dlp storage dlp = _dlps[dlpId];
+        uint256 stakedAmountBeforeCurrentEpoch = stakerDlp.stakedAmount - stakerDlpEpoch.stakedAmount;
 
-        uint256 dlpRewardAmount = (epochDlps.score * epoch.reward) / 1e18;
-
-        if (dlpRewardAmount <= epochDlps.withdrawnAmount) {
+        if (stakedAmountBeforeCurrentEpoch == 0 || stakerDlpEpoch.withdrawnReward > 0 || epochDlpReward == 0) {
             revert NothingToClaim();
         }
 
-        uint256 unclaimedReward = dlpRewardAmount - epochDlps.withdrawnAmount;
+        Epoch storage epoch = _epochs[epochNumber];
+        EpochDlp storage epochDlp = epoch.dlps[dlpId];
 
-        if (totalDlpsRewardAmount > unclaimedReward) {
-            epoch.dlps[dlpId].withdrawnAmount = dlpRewardAmount;
-            totalDlpsRewardAmount -= unclaimedReward;
-            dlp.ownerAddress.transfer(unclaimedReward);
+        uint256 rewardAmount = (stakedAmountBeforeCurrentEpoch * epochDlpReward) / epochDlp.stakedAmount;
 
-            emit EpochRewardClaimed(dlpId, epochNumber, unclaimedReward);
-        }
+        stakerDlpEpoch.withdrawnReward = rewardAmount;
+
+        payable(msg.sender).transfer(rewardAmount);
+
+        emit EpochRewardClaimed(msg.sender, epochNumber, dlpId, rewardAmount);
     }
 
-    function stake(uint256 dlpId) public payable override {
+    function stake(uint256 dlpId) external payable override whenActiveCurrentEpoch {
         _addStake(msg.sender, dlpId, msg.value);
+    }
+
+    function unstake(uint256 dlpId, uint256 amount) external override whenActiveCurrentEpoch {
+        if (amount > _stakers[msg.sender].dlps[dlpId].stakedAmount) {
+            revert InvalidUnstakeAmount();
+        }
+
+        _unstake(msg.sender, dlpId, amount);
+    }
+
+    /**
+     * @notice Allows the owner to withdraw tokens from the contract
+     *
+     * @param _token    address of the token to withdraw use address(0) for ETH
+     * @param _to       address where the token will be send
+     * @param _amount   amount to withdraw
+     */
+    function withdraw(
+        address _token,
+        address _to,
+        uint256 _amount
+    ) external override onlyOwner nonReentrant returns (bool success) {
+        if (_token == address(0)) {
+            (success, ) = _to.call{value: _amount}("");
+            return success;
+        } else {
+            IERC20(_token).safeTransfer(_to, _amount);
+            success = true;
+        }
     }
 
     function _deregisterDlp(uint256 dlpId) internal {
@@ -661,89 +657,122 @@ DataLiquidityPoolsRootStorageV1
         }
 
         dlp.status = DlpStatus.Deregistered;
-        dlp.lastBlockNumber = block.number;
 
         _registeredDlps.remove(dlpId);
 
         emit DlpDeregistered(dlpId);
     }
 
-    /**
-     * @notice Set the emission scores for the dlps
-     *
-     * @param epochNumber                   epoch number
-     */
-    function _setEmissionScores(uint256 epochNumber) internal {
-        EnumerableSet.UintSet storage epochDlpIds = _epochs[epochNumber].dlpIds;
-
-        uint256 epochDlpsCount = epochDlpIds.length();
-
-        Epoch storage epoch = _epochs[epochNumber];
-        for (uint256 i = 0; i < epochDlpsCount; i++) {
-            uint256 dlpId = epochDlpIds.at(i);
-            Dlp storage dlp = _dlps[dlpId];
-            uint256 dlpRewardAmount = (dlp.score * epoch.reward) / 1e18;
-
-            EpochDlp storage epochDlps = epoch.dlps[dlpId];
-
-            epochDlps.score = dlp.score;
-
-            //send the reward to the dlps
-            if (
-                dlpRewardAmount > 0 && totalDlpsRewardAmount > dlpRewardAmount
-            ) {
-                epochDlps.withdrawnAmount = dlpRewardAmount;
-                totalDlpsRewardAmount -= dlpRewardAmount;
-                dlp.ownerAddress.transfer(dlpRewardAmount);
-            }
-        }
-    }
-
-    function _addStake(
-        address stakerAddress,
-        uint256 dlpId,
-        uint256 amount
-    ) internal {
-        StakerInfo storage _stakerInfo = _stakers[stakerAddress];
-
-        _stakerInfo.totalStaked += amount;
-        _stakerInfo.stakedDlps[dlpId] += amount;
-
+    function _addStake(address stakerAddress, uint256 dlpId, uint256 amount) internal {
         Dlp storage dlp = _dlps[dlpId];
+
+        if (dlp.status != DlpStatus.Registered) {
+            revert InvalidDlpStatus();
+        }
         dlp.stakeAmount += amount;
+
+        Staker storage staker = _stakers[stakerAddress];
+
+        staker.totalStaked += amount;
+        staker.dlps[dlpId].stakedAmount += amount;
+        staker.dlps[dlpId].epochs[epochsCount].stakedAmount += amount;
 
         emit Staked(stakerAddress, dlpId, amount);
     }
 
-    function _unstake(
-        address stakerAddress,
-        uint256 dlpId,
-        uint256 amount
-    ) internal {
-        StakerInfo storage _stakerInfo = _stakers[stakerAddress];
+    function _unstake(address stakerAddress, uint256 dlpId, uint256 amount) internal {
+        Staker storage staker = _stakers[stakerAddress];
 
-        _stakerInfo.totalStaked -= amount;
-        _stakerInfo.stakedDlps[dlpId] -= amount;
+        staker.totalStaked -= amount;
+        staker.dlps[dlpId].stakedAmount -= amount;
+        if (staker.dlps[dlpId].epochs[epochsCount].stakedAmount > amount) {
+            staker.dlps[dlpId].epochs[epochsCount].stakedAmount -= amount;
+        } else {
+            staker.dlps[dlpId].epochs[epochsCount].stakedAmount = 0;
+        }
 
-        Dlp storage dlp = _dlps[dlpId];
-        dlp.stakeAmount -= amount;
+        _dlps[dlpId].stakeAmount -= amount;
 
         payable(stakerAddress).transfer(amount);
 
         emit Unstaked(stakerAddress, dlpId, amount);
     }
 
-    function _selectTopStakedDlps() internal returns(uint256[] memory topDlps) {
-        uint256[] memory dlps = _registeredDlps.values();
-        uint256 dlpsCount = dlps.length;
+    function getTopDlpsIds(uint256 numberOfDlps) public view override returns (uint256[] memory) {
+        uint256[] memory registeredDlpIds = _registeredDlps.values();
+        uint256 dlpsCount = registeredDlpIds.length;
 
-        if (dlpsCount <= maxNumberOfDlps) {
-            return dlps;
+        numberOfDlps = Math.min(numberOfDlps, dlpsCount);
+
+        uint256[] memory topDlpIds = new uint256[](numberOfDlps);
+
+        if (numberOfDlps == 0) {
+            return topDlpIds;
         }
 
-        topDlps = new uint256[](maxNumberOfDlps);
+        uint256 index;
+        uint256 position;
 
-        uint256[] memory stakedAmounts = new uint256[](dlpsCount);
+        topDlpIds[0] = registeredDlpIds[0];
 
+        Dlp storage currentDlp;
+        Dlp storage previousDlp;
+
+        for (index = 1; index < numberOfDlps; index++) {
+            position = index;
+
+            currentDlp = _dlps[registeredDlpIds[index]];
+            previousDlp = _dlps[topDlpIds[position - 1]];
+
+            while (
+                previousDlp.stakeAmount < currentDlp.stakeAmount ||
+                (previousDlp.stakeAmount == currentDlp.stakeAmount && previousDlp.id > currentDlp.id)
+            ) {
+                topDlpIds[position] = topDlpIds[position - 1];
+                position--;
+
+                if (position == 0) {
+                    break;
+                } else {
+                    previousDlp = _dlps[topDlpIds[position - 1]];
+                }
+            }
+
+            topDlpIds[position] = registeredDlpIds[index];
+        }
+
+        for (index = numberOfDlps; index < dlpsCount; index++) {
+            position = numberOfDlps - 1;
+
+            currentDlp = _dlps[registeredDlpIds[index]];
+            previousDlp = _dlps[topDlpIds[position]];
+
+            if (
+                previousDlp.stakeAmount > currentDlp.stakeAmount ||
+                (previousDlp.stakeAmount == currentDlp.stakeAmount && previousDlp.id < currentDlp.id)
+            ) {
+                continue;
+            }
+
+            previousDlp = _dlps[topDlpIds[position - 1]];
+
+            while (
+                previousDlp.stakeAmount < currentDlp.stakeAmount ||
+                (previousDlp.stakeAmount == currentDlp.stakeAmount && previousDlp.id > currentDlp.id)
+            ) {
+                topDlpIds[position] = topDlpIds[position - 1];
+                position--;
+
+                if (position == 0) {
+                    break;
+                } else {
+                    previousDlp = _dlps[topDlpIds[position - 1]];
+                }
+            }
+
+            topDlpIds[position] = registeredDlpIds[index];
+        }
+
+        return topDlpIds;
     }
 }
