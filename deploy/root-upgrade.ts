@@ -3,10 +3,10 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { getUUPSImplementationAddress, verifyProxy } from "./helpers";
 
-const implementationContractName = "DataLiquidityPoolImplementation";
-const proxyContractName = "DataLiquidityPoolProxy";
+const implementationContractName = "DataLiquidityPoolsRootImplementation";
+const proxyContractName = "DataLiquidityPoolsRootProxy";
 const proxyContractPath =
-  "contracts/dlp/DataLiquidityPoolProxy.sol:DataLiquidityPoolProxy";
+  "contracts/root/DataLiquidityPoolsRootProxy.sol:DataLiquidityPoolsRootProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(``);

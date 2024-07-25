@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import {Treasury} from "../../treasury/Treasury.sol";
+import {FileRegistryImplementation} from "../../fileRegistry/FileRegistryImplementation.sol";
 
-contract TreasuryV2Mock is Treasury {
+contract FileRegistryImplementationV2Mock is FileRegistryImplementation {
     /**
      * @notice Upgrade the contract
      * This function is required by OpenZeppelin's UUPSUpgradeable

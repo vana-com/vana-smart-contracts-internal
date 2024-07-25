@@ -1,6 +1,6 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import '@openzeppelin/hardhat-upgrades';
+import "@openzeppelin/hardhat-upgrades";
 import "hardhat-deploy";
 import * as dotenv from "dotenv";
 
@@ -15,18 +15,19 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200
-      }
-    }
+        runs: 200,
+      },
+    },
   },
   networks: {
-    hardhat: {
-    },
+    hardhat: {},
     satori: {
       url: process.env.SATORI_RPC_URL || "",
       accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-    }
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
   },
   etherscan: {
     apiKey: {
@@ -40,28 +41,27 @@ module.exports = {
         urls: {
           apiURL: process.env.SATORI_API_URL || "",
           browserURL: process.env.SATORI_BROWSER_URL || "",
-        }
-      }
-    ]
+        },
+      },
+    ],
   },
   sourcify: {
-    enabled: false
+    enabled: false,
   },
   paths: {
     sources: "./contracts",
     tests: "./test",
     cache: "./cache",
-    artifacts: "./artifacts"
+    artifacts: "./artifacts",
   },
   mocha: {
-    timeout: 40000
+    timeout: 40000,
   },
   gasReporter: {
     enabled: true,
     excludeContracts: ["mocks", "tests"],
-    include: ["../node_module/@openzeppelin/contracts-upgradeable"]
-  }
-}
-
+    include: ["../node_module/@openzeppelin/contracts-upgradeable"],
+  },
+};
 
 export default config;

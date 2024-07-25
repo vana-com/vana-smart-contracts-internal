@@ -44,7 +44,7 @@ npx hardhat verify --network satori <data_liquidity_pools_root_address>
 npx hardhat deploy --network satori --tags DLPDeploy
 ```
 
-This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts using the recommended params for testing. If you need a different setup, you can change them in the `deploy/dlp-deploy.ts` script.
+This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts using the recommended params for testing. If you need a different setup, you can change them in the `deploy/dlp-deploy0.ts` script.
 
 9. Verify the `DataLiquidityPool` and `DataLiquidityPoolToken` contracts:
 

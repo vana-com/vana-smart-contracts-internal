@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract DataLiquidityPoolV3Mock is UUPSUpgradeable {
+contract FileRegistryImplementationV3Mock is UUPSUpgradeable {
     uint256 test;
 
     function _authorizeUpgrade(address newImplementation) internal virtual override {}

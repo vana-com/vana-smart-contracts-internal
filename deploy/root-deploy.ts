@@ -1,43 +1,69 @@
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { parseEther } from "ethers";
 import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
+import { deployProxy, verifyProxy } from "./helpers";
+
+const implementationContractName = "DataLiquidityPoolsRootImplementation";
+const proxyContractName = "DataLiquidityPoolsRootProxy";
+const proxyContractPath =
+  "contracts/root/DataLiquidityPoolsRootProxy.sol:DataLiquidityPoolsRootProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-	const [deployer] = await ethers.getSigners();
+  const [deployer] = await ethers.getSigners();
 
-	const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
+  const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-	const maxNumberOfDlps = 10;
-	const rewardPeriodSize = 1800;
-	const minStakeAmount  = parseEther('0.1');
-	const startBlock: number = await getCurrentBlockNumber();
-	const rewardAmount = parseEther('1');
+  const maxNumberOfDlps = 10;
+  const rewardPeriodSize = 1800;
+  const minStakeAmount = parseEther("0.0001");
+  const startBlock: number = await getCurrentBlockNumber();
+  const rewardAmount = parseEther("0.001");
+  const addRewardToDlpAmount = parseEther("0.1");
 
-	const dlpRootDeploy = await upgrades.deployProxy(
-		await ethers.getContractFactory("DataLiquidityPoolsRoot"),
-		[[
-			deployer.address,
-			maxNumberOfDlps,
-			minStakeAmount,
-			startBlock,
-			rewardPeriodSize,
-			rewardAmount
-		]],
-		{
-		  kind: "uups"
-		}
-	  );
-	const dlp = await ethers.getContractAt("DataLiquidityPoolsRoot", dlpRootDeploy.target);	
+  const initializeParams = [
+    [
+      deployer.address,
+      maxNumberOfDlps,
+      minStakeAmount,
+      startBlock,
+      rewardPeriodSize,
+      rewardAmount,
+    ],
+  ];
 
-	console.log("DataLiquidityPoolsRoot deployed at:", dlp.target);
+  const proxyDeploy = await deployProxy(
+    deployer,
+    proxyContractName,
+    implementationContractName,
+    initializeParams,
+  );
 
-	await new Promise((resolve) => setTimeout(resolve, 10000));
+  console.log(``);
+  console.log(``);
+  console.log(``);
+  console.log(`**************************************************************`);
+  console.log(`**************************************************************`);
+  console.log(`**************************************************************`);
+  console.log(`********** Add reward and transfer ownership **********`);
 
-	await dlp.addRewardForDlps({value: parseEther('100')});
+  const proxy = await ethers.getContractAt(
+    implementationContractName,
+    proxyDeploy.proxyAddress,
+  );
 
-	await dlp.transferOwnership(ownerAddress);
+  await proxy.addRewardForDlps({ value: addRewardToDlpAmount });
+  await proxy.transferOwnership(ownerAddress);
+
+  await verifyProxy(
+    proxyDeploy.proxyAddress,
+    proxyDeploy.implementationAddress,
+    proxyDeploy.initializeData,
+    proxyContractPath,
+  );
+
+  return;
 };
 
 export default func;

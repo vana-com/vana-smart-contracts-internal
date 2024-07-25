@@ -12,7 +12,7 @@ import "./interfaces/DataLiquidityPoolStorageV1.sol";
 
 import "hardhat/console.sol";
 
-contract DataLiquidityPool is
+contract DataLiquidityPoolImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
@@ -525,14 +525,14 @@ contract DataLiquidityPool is
     /**
      * @dev Pauses the contract
      */
-    function pause() public override onlyOwner {
+    function pause() external override onlyOwner {
         _pause();
     }
 
     /**
      * @dev Unpauses the contract
      */
-    function unpause() public override onlyOwner {
+    function unpause() external override onlyOwner {
         _unpause();
     }
 

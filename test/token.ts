@@ -20,16 +20,20 @@ describe("ERC20Swapper", () => {
   let dat: DAT;
 
   const deploy = async () => {
-    [deployer, owner, admin, user1, user2, user3, user4] = await ethers.getSigners();
+    [deployer, owner, admin, user1, user2, user3, user4] =
+      await ethers.getSigners();
 
-    dat = await ethers.deployContract("DAT", ["Test Data Autonomy Token", "TDAT", owner.address]);
+    dat = await ethers.deployContract("DAT", [
+      "Test Data Autonomy Token",
+      "TDAT",
+      owner.address,
+    ]);
 
     await dat.connect(owner).changeAdmin(admin);
-  }
+  };
 
   describe("DLPT - basic", () => {
-    before(async function () {
-    });
+    before(async function () {});
 
     beforeEach(async () => {
       await deploy();
@@ -44,56 +48,63 @@ describe("ERC20Swapper", () => {
     });
 
     it("Should transferOwnership in 2 steps", async function () {
-      await dat.connect(owner).transferOwnership(user2.address)
+      await dat
+        .connect(owner)
+        .transferOwnership(user2.address)
         .should.emit(dat, "OwnershipTransferStarted")
         .withArgs(owner, user2);
       (await dat.owner()).should.eq(owner);
 
-      await dat.connect(owner).transferOwnership(user3.address)
+      await dat
+        .connect(owner)
+        .transferOwnership(user3.address)
         .should.emit(dat, "OwnershipTransferStarted")
         .withArgs(owner, user3);
       (await dat.owner()).should.eq(owner);
 
-      await dat.connect(user3).acceptOwnership()
-        .should.fulfilled;
+      await dat.connect(user3).acceptOwnership().should.fulfilled;
       (await dat.owner()).should.eq(user3);
     });
 
     it("Should reject transferOwnership when non-owner", async function () {
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .transferOwnership(user2)
         .should.be.rejectedWith(
-          `OwnableUnauthorizedAccount("${admin.address}")`
+          `OwnableUnauthorizedAccount("${admin.address}")`,
         );
     });
 
     it("Should changeAdmin when owner", async function () {
-      await dat.connect(owner).changeAdmin(user2.address)
+      await dat
+        .connect(owner)
+        .changeAdmin(user2.address)
         .should.emit(dat, "AdminChanged")
         .withArgs(admin, user2);
       (await dat.admin()).should.eq(user2);
     });
 
     it("Should reject changeAdmin when non-owner", async function () {
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .changeAdmin(user2)
         .should.be.rejectedWith(
-          `OwnableUnauthorizedAccount("${admin.address}")`
+          `OwnableUnauthorizedAccount("${admin.address}")`,
         );
     });
 
     it("Should blockMint when owner", async function () {
-      await dat.connect(owner).blockMint()
-        .should.emit(dat, "MintBlocked");
+      await dat.connect(owner).blockMint().should.emit(dat, "MintBlocked");
 
       (await dat.mintBlocked()).should.eq(true);
     });
 
     it("Should reject blockMint when non-owner", async function () {
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockMint()
         .should.be.rejectedWith(
-          `OwnableUnauthorizedAccount("${admin.address}")`
+          `OwnableUnauthorizedAccount("${admin.address}")`,
         );
     });
 
@@ -102,26 +113,25 @@ describe("ERC20Swapper", () => {
 
       (await dat.balanceOf(user2)).should.eq(0);
 
-      await dat.connect(owner)
-        .mint(user2, mintAmount)
-        .should.be.fulfilled;
+      await dat.connect(owner).mint(user2, mintAmount).should.be.fulfilled;
 
       (await dat.balanceOf(user2)).should.eq(mintAmount);
     });
 
     it("Should reject mint when non-owner", async function () {
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .mint(user1, parseEther("10"))
         .should.be.rejectedWith(
-          `OwnableUnauthorizedAccount("${admin.address}")`
+          `OwnableUnauthorizedAccount("${admin.address}")`,
         );
     });
 
     it("Should reject mint when minting is blocked", async function () {
-      await dat.connect(owner).blockMint()
-        .should.emit(dat, "MintBlocked");
+      await dat.connect(owner).blockMint().should.emit(dat, "MintBlocked");
 
-      await dat.connect(owner)
+      await dat
+        .connect(owner)
         .mint(user1, parseEther("10"))
         .should.be.rejectedWith(`EnforceMintBlocked()`);
     });
@@ -129,7 +139,8 @@ describe("ERC20Swapper", () => {
     it("Should blockAddress when admin", async function () {
       (await dat.blockListLength()).should.eq(0);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user2)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user2);
@@ -139,15 +150,17 @@ describe("ERC20Swapper", () => {
     });
 
     it("Should reject blockAddress when non-admin", async function () {
-      await dat.connect(user3)
+      await dat
+        .connect(user3)
         .blockAddress(user2)
-        .should.be.rejectedWith(`UnauthorizedAdminAction("${user3.address}")`)
+        .should.be.rejectedWith(`UnauthorizedAdminAction("${user3.address}")`);
     });
 
     it("Should unblockAddress when admin #1", async function () {
       (await dat.blockListLength()).should.eq(0);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user2)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user2);
@@ -155,7 +168,8 @@ describe("ERC20Swapper", () => {
       (await dat.blockListLength()).should.eq(1);
       (await dat.blockListAt(0)).should.eq(user2);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .unblockAddress(user2)
         .should.emit(dat, "AddressUnblocked")
         .withArgs(user2);
@@ -164,20 +178,23 @@ describe("ERC20Swapper", () => {
     });
 
     it("Should reject unblockAddress when non-admin", async function () {
-      await dat.connect(user3)
+      await dat
+        .connect(user3)
         .unblockAddress(user2)
-        .should.be.rejectedWith(`UnauthorizedAdminAction("${user3.address}")`)
+        .should.be.rejectedWith(`UnauthorizedAdminAction("${user3.address}")`);
     });
 
     it("Should unblockAddress when admin #2", async function () {
       (await dat.blockListLength()).should.eq(0);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user2)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user2);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user3)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user3);
@@ -186,7 +203,8 @@ describe("ERC20Swapper", () => {
       (await dat.blockListAt(0)).should.eq(user2);
       (await dat.blockListAt(1)).should.eq(user3);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .unblockAddress(user2)
         .should.emit(dat, "AddressUnblocked")
         .withArgs(user2);
@@ -205,7 +223,8 @@ describe("ERC20Swapper", () => {
       (await dat.balanceOf(user2)).should.eq(0);
       (await dat.totalSupply()).should.eq(mintAmount);
 
-      await dat.connect(user1)
+      await dat
+        .connect(user1)
         .transfer(user2, parseEther("20"))
         .should.emit(dat, "Transfer")
         .withArgs(user1, user2, parseEther("20"));
@@ -219,7 +238,8 @@ describe("ERC20Swapper", () => {
       const mintAmount = parseEther("100");
       const transferAmount = parseEther("20");
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user2)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user2);
@@ -230,7 +250,8 @@ describe("ERC20Swapper", () => {
       (await dat.balanceOf(user3)).should.eq(0);
       (await dat.totalSupply()).should.eq(mintAmount);
 
-      await dat.connect(user2)
+      await dat
+        .connect(user2)
         .transfer(user2, parseEther("20"))
         .should.rejectedWith(`UnauthorizedUserAction("${user2.address}")`);
 
@@ -243,7 +264,8 @@ describe("ERC20Swapper", () => {
       const mintAmount = parseEther("100");
       const transferAmount = parseEther("20");
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .blockAddress(user2)
         .should.emit(dat, "AddressBlocked")
         .withArgs(user2);
@@ -254,7 +276,8 @@ describe("ERC20Swapper", () => {
       (await dat.balanceOf(user3)).should.eq(0);
       (await dat.totalSupply()).should.eq(mintAmount);
 
-      await dat.connect(user2)
+      await dat
+        .connect(user2)
         .transfer(user2, parseEther("20"))
         .should.rejectedWith(`UnauthorizedUserAction("${user2.address}")`);
 
@@ -262,12 +285,14 @@ describe("ERC20Swapper", () => {
       (await dat.balanceOf(user3)).should.eq(0);
       (await dat.totalSupply()).should.eq(mintAmount);
 
-      await dat.connect(admin)
+      await dat
+        .connect(admin)
         .unblockAddress(user2)
         .should.emit(dat, "AddressUnblocked")
         .withArgs(user2);
 
-      await dat.connect(user2)
+      await dat
+        .connect(user2)
         .transfer(user3, parseEther("20"))
         .should.emit(dat, "Transfer")
         .withArgs(user2, user3, parseEther("20"));
@@ -276,6 +301,5 @@ describe("ERC20Swapper", () => {
       (await dat.balanceOf(user3)).should.eq(transferAmount);
       (await dat.totalSupply()).should.eq(mintAmount);
     });
-
   });
 });

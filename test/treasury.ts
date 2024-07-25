@@ -1,13 +1,8 @@
 import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
-import { ContractTransactionReceipt, Wallet } from "ethers";
-import { DAT, DataLiquidityPoolsRoot, Treasury } from "../typechain-types";
+import { DAT, TreasuryImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import {
-  advanceToBlockN,
-  getCurrentBlockNumber,
-} from "../utils/timeAndBlockManipulation";
 import { parseEther } from "../utils/helpers";
 
 chai.use(chaiAsPromised);
@@ -20,20 +15,23 @@ describe("Treasury", () => {
   let user2: HardhatEthersSigner;
   let user3: HardhatEthersSigner;
 
-  let treasury: Treasury;
+  let treasury: TreasuryImplementation;
 
   const deploy = async () => {
     [deployer, owner, user1, user2, user3] = await ethers.getSigners();
 
     const treasuryDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("Treasury"),
+      await ethers.getContractFactory("TreasuryImplementation"),
       [owner.address],
       {
         kind: "uups",
       },
     );
 
-    treasury = await ethers.getContractAt("Treasury", treasuryDeploy.target);
+    treasury = await ethers.getContractAt(
+      "TreasuryImplementation",
+      treasuryDeploy.target,
+    );
   };
 
   describe("Setup", () => {
@@ -97,11 +95,11 @@ describe("Treasury", () => {
     it("Should upgradeTo when owner", async function () {
       await upgrades.upgradeProxy(
         treasury,
-        await ethers.getContractFactory("DataLiquidityPoolsRootV2Mock", owner),
+        await ethers.getContractFactory("TreasuryImplementationV2Mock", owner),
       );
 
       const newRoot = await ethers.getContractAt(
-        "DataLiquidityPoolsRootV2Mock",
+        "TreasuryImplementationV2Mock",
         treasury,
       );
       (await newRoot.owner()).should.eq(owner);
@@ -112,7 +110,7 @@ describe("Treasury", () => {
 
     it("Should upgradeTo when owner and emit event", async function () {
       const newRootImplementation = await ethers.deployContract(
-        "DataLiquidityPoolsRootV2Mock",
+        "TreasuryImplementationV2Mock",
       );
 
       await treasury
@@ -122,14 +120,12 @@ describe("Treasury", () => {
         .withArgs(newRootImplementation);
 
       const newRoot = await ethers.getContractAt(
-        "DataLiquidityPoolsRootV2Mock",
+        "TreasuryImplementationV2Mock",
         treasury,
       );
 
       (await newRoot.owner()).should.eq(owner);
       (await newRoot.version()).should.eq(2);
-
-      (await newRoot.epochsCount()).should.eq(0);
 
       (await newRoot.test()).should.eq("test");
     });
@@ -139,7 +135,7 @@ describe("Treasury", () => {
         .upgradeProxy(
           treasury,
           await ethers.getContractFactory(
-            "DataLiquidityPoolsRootV3Mock",
+            "TreasuryImplementationV3Mock",
             owner,
           ),
         )
@@ -148,7 +144,7 @@ describe("Treasury", () => {
 
     it("Should reject upgradeTo when non owner", async function () {
       const newRootImplementation = await ethers.deployContract(
-        "DataLiquidityPoolsRootV2Mock",
+        "TreasuryImplementationV2Mock",
       );
 
       await treasury

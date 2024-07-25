@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/TreasuryStorageV1.sol";
 
-contract Treasury is
+contract TreasuryImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
@@ -50,14 +50,14 @@ contract Treasury is
     }
 
     /**
-     * @notice Fallback function to receive ETH
+     * @notice Fallback function to receive VANA
      */
     receive() external payable {}
 
     /**
      * @notice Allows the owner to withdraw tokens from the contract
      *
-     * @param _token    address of the token to withdraw use address(0) for ETH
+     * @param _token    address of the token to withdraw use address(0) for VANA
      * @param _to       address where the token will be send
      * @param _amount   amount to withdraw
      */

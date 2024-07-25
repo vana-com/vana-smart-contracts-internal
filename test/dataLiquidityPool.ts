@@ -2,7 +2,7 @@ import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
 import { BigNumberish, parseEther } from "ethers";
-import { DAT, DataLiquidityPool } from "../typechain-types";
+import { DAT, DataLiquidityPoolImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   advanceBlockNTimes,
@@ -51,7 +51,7 @@ describe("DataLiquidityPool", () => {
   let user14: HardhatEthersSigner;
   let user15: HardhatEthersSigner;
 
-  let dlp: DataLiquidityPool;
+  let dlp: DataLiquidityPoolImplementation;
   let dat: DAT;
 
   const dlpName = "Test DLP";
@@ -119,7 +119,7 @@ describe("DataLiquidityPool", () => {
     startBlock = (await getCurrentBlockNumber()) + 1;
 
     const dlpDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("DataLiquidityPool"),
+      await ethers.getContractFactory("DataLiquidityPoolImplementation"),
       [
         [
           dlpName,
@@ -143,7 +143,10 @@ describe("DataLiquidityPool", () => {
       },
     );
 
-    dlp = await ethers.getContractAt("DataLiquidityPool", dlpDeploy.target);
+    dlp = await ethers.getContractAt(
+      "DataLiquidityPoolImplementation",
+      dlpDeploy.target,
+    );
 
     await dat.connect(owner).mint(dlp, dlpInitialBalance);
     await dat.connect(owner).mint(v1Owner, v1OwnerInitialBalance);
@@ -509,10 +512,16 @@ describe("DataLiquidityPool", () => {
     it("Should upgradeTo when owner", async function () {
       await upgrades.upgradeProxy(
         dlp,
-        await ethers.getContractFactory("DataLiquidityPoolV2Mock", owner),
+        await ethers.getContractFactory(
+          "DataLiquidityPoolImplementationV2Mock",
+          owner,
+        ),
       );
 
-      const newDlp = await ethers.getContractAt("DataLiquidityPoolV2Mock", dlp);
+      const newDlp = await ethers.getContractAt(
+        "DataLiquidityPoolImplementationV2Mock",
+        dlp,
+      );
 
       (await newDlp.name()).should.eq(dlpName);
       (await newDlp.owner()).should.eq(owner);
@@ -535,7 +544,7 @@ describe("DataLiquidityPool", () => {
 
     it("Should upgradeTo when owner and emit event", async function () {
       const newDlpImplementation = await ethers.deployContract(
-        "DataLiquidityPoolV2Mock",
+        "DataLiquidityPoolImplementationV2Mock",
       );
 
       await dlp
@@ -544,7 +553,10 @@ describe("DataLiquidityPool", () => {
         .should.emit(dlp, "Upgraded")
         .withArgs(newDlpImplementation);
 
-      const newDlp = await ethers.getContractAt("DataLiquidityPoolV2Mock", dlp);
+      const newDlp = await ethers.getContractAt(
+        "DataLiquidityPoolImplementationV2Mock",
+        dlp,
+      );
 
       (await newDlp.name()).should.eq(dlpName);
       (await newDlp.owner()).should.eq(owner);
@@ -569,14 +581,17 @@ describe("DataLiquidityPool", () => {
       await upgrades
         .upgradeProxy(
           dlp,
-          await ethers.getContractFactory("DataLiquidityPoolV3Mock", owner),
+          await ethers.getContractFactory(
+            "DataLiquidityPoolImplementationV3Mock",
+            owner,
+          ),
         )
         .should.be.rejectedWith("New storage layout is incompatible");
     });
 
     it("Should reject upgradeTo when non owner", async function () {
       const newDlpImplementation = await ethers.deployContract(
-        "DataLiquidityPoolV2Mock",
+        "DataLiquidityPoolImplementationV2Mock",
       );
 
       await dlp

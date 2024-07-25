@@ -2,7 +2,7 @@ import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
 import { ContractTransactionReceipt, Wallet } from "ethers";
-import { DAT, DataLiquidityPoolsRoot } from "../typechain-types";
+import { DAT, DataLiquidityPoolsRootImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   advanceToBlockN,
@@ -36,7 +36,7 @@ describe("DataLiquidityPoolsRoot", () => {
   let user2: HardhatEthersSigner;
   let user3: HardhatEthersSigner;
 
-  let root: DataLiquidityPoolsRoot;
+  let root: DataLiquidityPoolsRootImplementation;
 
   const maxNumberOfDlps = 3;
   let epochSize = 100;
@@ -73,7 +73,7 @@ describe("DataLiquidityPoolsRoot", () => {
     startBlock = (await getCurrentBlockNumber()) + 200;
 
     const dlpRootDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("DataLiquidityPoolsRoot"),
+      await ethers.getContractFactory("DataLiquidityPoolsRootImplementation"),
       [
         [
           owner.address,
@@ -90,7 +90,7 @@ describe("DataLiquidityPoolsRoot", () => {
     );
 
     root = await ethers.getContractAt(
-      "DataLiquidityPoolsRoot",
+      "DataLiquidityPoolsRootImplementation",
       dlpRootDeploy.target,
     );
   };
@@ -387,11 +387,14 @@ describe("DataLiquidityPoolsRoot", () => {
     it("Should upgradeTo when owner", async function () {
       await upgrades.upgradeProxy(
         root,
-        await ethers.getContractFactory("DataLiquidityPoolsRootV2Mock", owner),
+        await ethers.getContractFactory(
+          "DataLiquidityPoolsRootImplementationV2Mock",
+          owner,
+        ),
       );
 
       const newRoot = await ethers.getContractAt(
-        "DataLiquidityPoolsRootV2Mock",
+        "DataLiquidityPoolsRootImplementationV2Mock",
         root,
       );
       (await newRoot.owner()).should.eq(owner);
@@ -409,7 +412,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("Should upgradeTo when owner and emit event", async function () {
       const newRootImplementation = await ethers.deployContract(
-        "DataLiquidityPoolsRootV2Mock",
+        "DataLiquidityPoolsRootImplementationV2Mock",
       );
 
       await root
@@ -419,7 +422,7 @@ describe("DataLiquidityPoolsRoot", () => {
         .withArgs(newRootImplementation);
 
       const newRoot = await ethers.getContractAt(
-        "DataLiquidityPoolsRootV2Mock",
+        "DataLiquidityPoolsRootImplementationV2Mock",
         root,
       );
 
@@ -441,7 +444,7 @@ describe("DataLiquidityPoolsRoot", () => {
         .upgradeProxy(
           root,
           await ethers.getContractFactory(
-            "DataLiquidityPoolsRootV3Mock",
+            "DataLiquidityPoolsRootImplementationV3Mock",
             owner,
           ),
         )
@@ -450,7 +453,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("Should reject upgradeTo when non owner", async function () {
       const newRootImplementation = await ethers.deployContract(
-        "DataLiquidityPoolsRootV2Mock",
+        "DataLiquidityPoolsRootImplementationV2Mock",
       );
 
       await root

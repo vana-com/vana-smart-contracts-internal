@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/DataLiquidityPoolsRootStorageV1.sol";
 
-contract DataLiquidityPoolsRoot is
+contract DataLiquidityPoolsRootImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
@@ -305,14 +305,14 @@ contract DataLiquidityPoolsRoot is
     /**
      * @dev Pauses the contract
      */
-    function pause() public override onlyOwner {
+    function pause() external override onlyOwner {
         _pause();
     }
 
     /**
      * @dev Unpauses the contract
      */
-    function unpause() public override onlyOwner {
+    function unpause() external override onlyOwner {
         _unpause();
     }
 
@@ -629,7 +629,7 @@ contract DataLiquidityPoolsRoot is
     /**
      * @notice Allows the owner to withdraw tokens from the contract
      *
-     * @param _token    address of the token to withdraw use address(0) for ETH
+     * @param _token    address of the token to withdraw use address(0) for VANA
      * @param _to       address where the token will be send
      * @param _amount   amount to withdraw
      */
