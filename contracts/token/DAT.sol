@@ -16,7 +16,7 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     EnumerableSet.AddressSet private _blockList;
 
     /**
-     * @dev Emitted when the pause is triggered by `account`.
+     * @dev Emitted when the pause is triggered by `owner`.
      */
     event MintBlocked();
 
@@ -78,6 +78,11 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         _;
     }
 
+    /**
+     * @dev Initializes the contract by setting a `name`, a `symbol` and an `ownerAddress`.
+     *
+     * See {ERC20-constructor}.
+     */
     constructor(
         string memory name,
         string memory symbol,
@@ -94,10 +99,16 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         return "mode=timestamp";
     }
 
+    /**
+     * @dev Returns the blockList length
+     */
     function blockListLength() external view returns (uint256) {
         return _blockList.length();
     }
 
+    /**
+     * @dev Returns the address at the given index in the blockList
+     */
     function blockListAt(uint256 _index) external view returns (address) {
         return _blockList.at(_index);
     }
@@ -110,10 +121,22 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         super._update(from, to, amount);
     }
 
+    /**
+     * @dev Returns the current nonce for `owner`. This value must be
+     * included whenever a signature is generated for `owner`.
+     */
     function nonces(address owner) public view virtual override(ERC20Permit, Nonces) returns (uint256) {
         return super.nonces(owner);
     }
 
+    /**
+     * @dev Mints `amount` tokens to `to`.
+     *
+     * @param to     the address to mint tokens to
+     * @param amount the amount of tokens to mint
+     *
+     * See {ERC20-_mint}.
+     */
     function mint(address to, uint256 amount) external virtual onlyOwner whenMintIsAllowed {
         _mint(to, amount);
     }
@@ -135,6 +158,7 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
      */
     function blockMint() external virtual onlyOwner whenMintIsAllowed {
         mintBlocked = true;
+
         emit MintBlocked();
     }
 

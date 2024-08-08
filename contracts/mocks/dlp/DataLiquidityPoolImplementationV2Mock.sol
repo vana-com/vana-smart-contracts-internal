@@ -22,7 +22,7 @@ contract DataLiquidityPoolImplementationV2Mock is DataLiquidityPoolImplementatio
     /**
      * @notice Tests the contract upgradeability
      */
-    function test() external view returns (string memory) {
+    function test() external pure returns (string memory) {
         return "test";
     }
 }

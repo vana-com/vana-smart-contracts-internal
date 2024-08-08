@@ -8,7 +8,7 @@ import {
   advanceToBlockN,
   getCurrentBlockNumber,
 } from "../utils/timeAndBlockManipulation";
-import { parseEther } from "../utils/helpers";
+import { getReceipt, parseEther } from "../utils/helpers";
 
 chai.use(chaiAsPromised);
 should();
@@ -137,14 +137,6 @@ describe("DataLiquidityPoolsRoot", () => {
 
   const generateStakes = (length: number, min: number, max: number) =>
     Array.from({ length }, () => Math.random() * (max - min) + min);
-
-  async function getReceipt(tx: any): Promise<ContractTransactionReceipt> {
-    const receipt = await tx.wait();
-    if (!receipt) {
-      throw new Error("No receipt");
-    }
-    return receipt;
-  }
 
   function getTopKStakes(arr: number[], k: number): BigInt[] {
     // Create an array of objects with value and original index
@@ -1070,10 +1062,6 @@ describe("DataLiquidityPoolsRoot", () => {
         .connect(dlp1Owner)
         .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
       const receipt = await getReceipt(tx);
-
-      if (!receipt) {
-        throw new Error("No receipt");
-      }
 
       await tx.should
         .emit(root, "DlpRegistered")
