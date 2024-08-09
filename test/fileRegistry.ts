@@ -4,6 +4,7 @@ import { ethers, upgrades } from "hardhat";
 import { FileRegistryImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
+import { parseEther } from "../utils/helpers";
 
 chai.use(chaiAsPromised);
 should();
@@ -283,426 +284,83 @@ describe("FileRegistry", () => {
     });
   });
 
-  describe("Request Permission", () => {
-    beforeEach(async () => {
-      await deploy();
-    });
-
-    it("should requestPermission, one file, one tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(1)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(1, tee1);
-
-      const file1 = await fileRegistry.files(1);
-      file1.permissionRequestsCount.should.eq(1);
-
-      (await fileRegistry.filePermissionRequests(1, 1)).should.eq(tee1);
-    });
-
-    it("should requestPermission, multiple files, one tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry.connect(user2).addFile("file2");
-      await fileRegistry.connect(user1).addFile("file3");
-
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(2)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(3)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(3, tee1);
-
-      const file1 = await fileRegistry.files(1);
-      file1.permissionRequestsCount.should.eq(0);
-
-      const file2 = await fileRegistry.files(2);
-      file2.permissionRequestsCount.should.eq(1);
-
-      const file3 = await fileRegistry.files(3);
-      file3.permissionRequestsCount.should.eq(1);
-
-      (await fileRegistry.filePermissionRequests(2, 1)).should.eq(tee1);
-      (await fileRegistry.filePermissionRequests(2, 1)).should.eq(tee1);
-    });
-
-    it("should requestPermission, multiple files, multiple tees", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry.connect(user2).addFile("file2");
-      await fileRegistry.connect(user3).addFile("file3");
-      await fileRegistry.connect(user1).addFile("file4");
-      await fileRegistry.connect(user2).addFile("file5");
-      await fileRegistry.connect(user2).addFile("file6");
-
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(2)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(3)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(3, tee1);
-      await fileRegistry
-        .connect(tee2)
-        .requestPermission(3)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(3, tee2);
-      await fileRegistry
-        .connect(tee3)
-        .requestPermission(3)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(3, tee3);
-      await fileRegistry
-        .connect(tee2)
-        .requestPermission(6)
-        .should.emit(fileRegistry, "PermissionRequested")
-        .withArgs(6, tee2);
-
-      const file1 = await fileRegistry.files(1);
-      file1.permissionRequestsCount.should.eq(0);
-
-      const file2 = await fileRegistry.files(2);
-      file2.permissionRequestsCount.should.eq(1);
-
-      const file3 = await fileRegistry.files(3);
-      file3.permissionRequestsCount.should.eq(3);
-
-      const file4 = await fileRegistry.files(4);
-      file4.permissionRequestsCount.should.eq(0);
-
-      const file5 = await fileRegistry.files(5);
-      file5.permissionRequestsCount.should.eq(0);
-
-      const file6 = await fileRegistry.files(6);
-      file6.permissionRequestsCount.should.eq(1);
-
-      (await fileRegistry.filePermissionRequests(2, 1)).should.eq(tee1);
-      (await fileRegistry.filePermissionRequests(3, 1)).should.eq(tee1);
-      (await fileRegistry.filePermissionRequests(3, 2)).should.eq(tee2);
-      (await fileRegistry.filePermissionRequests(3, 3)).should.eq(tee3);
-      (await fileRegistry.filePermissionRequests(6, 1)).should.eq(tee2);
-    });
-
-    it("should reject requestPermission when paused", async function () {
-      await fileRegistry.connect(owner).pause();
-
-      await fileRegistry
-        .connect(tee1)
-        .requestPermission(1)
-        .should.be.rejectedWith("EnforcedPause()");
-    });
-  });
-
-  describe("Authorize", () => {
-    beforeEach(async () => {
-      await deploy();
-    });
-
-    it("should addPermissions, one file, one tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("");
-    });
-
-    it("should addPermissions, one file, multiple tees #1", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1);
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee2, key: "key2" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("key2");
-    });
-
-    it("should addPermissions, one file, multiple tees #2", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [
-          { account: tee1, key: "key1" },
-          { account: tee2, key: "key2" },
-        ])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1)
-        .and.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("key2");
-    });
-
-    it("should addPermissions, multiple files, one tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry.connect(user2).addFile("file2");
-      await fileRegistry.connect(user1).addFile("file3");
-
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(2, [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(3, [{ account: tee1, key: "key2" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee1);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(2, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(3, tee1)).should.eq("key2");
-    });
-
-    it("should addPermissions, multiple files, multiple tees", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry.connect(user2).addFile("file2");
-      await fileRegistry.connect(user3).addFile("file3");
-      await fileRegistry.connect(user1).addFile("file4");
-      await fileRegistry.connect(user2).addFile("file5");
-      await fileRegistry.connect(user2).addFile("file6");
-
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(2, [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee1, key: "key2" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee1);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee2, key: "key3" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee2);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee3, key: "key4" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee3);
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(6, [{ account: tee2, key: "key5" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(6, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(2, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(3, tee1)).should.eq("key2");
-      (await fileRegistry.filePermissions(3, tee2)).should.eq("key3");
-      (await fileRegistry.filePermissions(3, tee3)).should.eq("key4");
-      (await fileRegistry.filePermissions(6, tee2)).should.eq("key5");
-    });
-
-    it("should reject addPermissions when non-owner", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(1, [{ account: tee1, key: "key1" }])
-        .should.be.rejectedWith("NotFileOwner()");
-    });
-
-    it("should reject addPermissions when paused", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry.connect(owner).pause();
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }])
-        .should.be.rejectedWith("EnforcedPause()");
-    });
-  });
-
-  describe("AddFileWithAuthorizations", () => {
-    beforeEach(async () => {
-      await deploy();
-    });
-
-    it("should addFileWithPermissions, one file, one tee", async function () {
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file1", [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(1, user1, "file1")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("");
-    });
-
-    it("should addFileWithPermissions, one file, multiple tees #1", async function () {
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file1", [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(1, user1, "file1")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1);
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee2, key: "key2" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("key2");
-    });
-
-    it("should addFileWithAuthorisations, one file, multiple tees #2", async function () {
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file1", [
-          { account: tee1, key: "key1" },
-          { account: tee2, key: "key2" },
-        ])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(1, user1, "file1")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee1)
-        .and.emit(fileRegistry, "PermissionGranted")
-        .withArgs(1, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(1, tee2)).should.eq("key2");
-    });
-
-    it("should addFileWithAuthorisations, multiple files, one tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-
-      await fileRegistry
-        .connect(user2)
-        .addFileWithPermissions("file2", [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(2, user2, "file2")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file3", [{ account: tee1, key: "key2" }])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(3, user1, "file3")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee1);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(2, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(3, tee1)).should.eq("key2");
-    });
-
-    it("should addFileWithAuthorisations, multiple files, multiple tees", async function () {
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file1", [])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(1, user1, "file1");
-      await fileRegistry
-        .connect(user2)
-        .addFileWithPermissions("file2", [{ account: tee1, key: "key1" }])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(2, user2, "file2")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(2, tee1);
-      await fileRegistry
-        .connect(user3)
-        .addFileWithPermissions("file3", [
-          { account: tee1, key: "key2" },
-          { account: tee2, key: "key3" },
-          { account: tee3, key: "key4" },
-        ])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(3, user3, "file3")
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee1)
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee2)
-        .emit(fileRegistry, "PermissionGranted")
-        .withArgs(3, tee3);
-
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file4", [])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(4, user1, "file4");
-
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file5", [])
-        .should.emit(fileRegistry, "FileAdded")
-        .withArgs(5, user1, "file5");
-
-      await fileRegistry
-        .connect(user2)
-        .addFileWithPermissions("file6", [{ account: tee2, key: "key5" }])
-        .should.emit(fileRegistry, "PermissionGranted")
-        .withArgs(6, tee2);
-
-      (await fileRegistry.filePermissions(1, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(2, tee1)).should.eq("key1");
-      (await fileRegistry.filePermissions(3, tee1)).should.eq("key2");
-      (await fileRegistry.filePermissions(3, tee2)).should.eq("key3");
-      (await fileRegistry.filePermissions(3, tee3)).should.eq("key4");
-      (await fileRegistry.filePermissions(4, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(5, tee1)).should.eq("");
-      (await fileRegistry.filePermissions(6, tee2)).should.eq("key5");
-    });
-
-    it("should reject addFileWithAuthorisations when paused", async function () {
-      await fileRegistry.connect(owner).pause();
-
-      await fileRegistry
-        .connect(user1)
-        .addFileWithPermissions("file1", [{ account: tee1, key: "key1" }])
-        .should.be.rejectedWith("EnforcedPause()");
-    });
-  });
-
   describe("Proof", () => {
     beforeEach(async () => {
       await deploy();
     });
 
+    const proof1 = {
+      signature:
+        "0x0e7c76080bebdcaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
+      data: {
+        score: parseEther(0.1),
+        timestamp: 12345678912,
+        metadata: "metadata1",
+        proofUrl:
+          "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll1",
+        instruction:
+          "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll1",
+      },
+    };
+
+    const proof2 = {
+      signature:
+        "0x1f7c76080bebdcaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
+      data: {
+        score: parseEther(0.3),
+        timestamp: 1234654321,
+        metadata: "metadata2",
+        proofUrl:
+          "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll2",
+        instruction:
+          "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll2",
+      },
+    };
+
+    const proof3 = {
+      signature:
+        "0x3453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
+      data: {
+        score: parseEther(0.5),
+        timestamp: 12340202022,
+        metadata: "metadata3",
+        proofUrl:
+          "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll3",
+        instruction:
+          "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll3",
+      },
+    };
+
+    const proof4 = {
+      signature:
+        "0x4453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
+      data: {
+        score: parseEther(0.7),
+        timestamp: 123402020444,
+        metadata: "metadata4",
+        proofUrl:
+          "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll4",
+        instruction:
+          "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll4",
+      },
+    };
+
+    const proof5 = {
+      signature:
+        "0x5453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
+      data: {
+        score: parseEther(0.9),
+        timestamp: 12340202111,
+        metadata: "metadata5",
+        proofUrl:
+          "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll5",
+        instruction:
+          "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll5",
+      },
+    };
+
     it("should addProof, one file, one tee", async function () {
       await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }]);
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
 
       await fileRegistry
         .connect(tee1)
@@ -710,42 +368,17 @@ describe("FileRegistry", () => {
         .should.emit(fileRegistry, "ProofAdded")
         .withArgs(1, tee1);
 
-      const file1Proof1 = await fileRegistry.fileProofs(1, tee1);
-
-      file1Proof1.valid.should.eq(proof1.valid);
-      file1Proof1.score.should.eq(proof1.score);
-      file1Proof1.authenticity.should.eq(proof1.authenticity);
-      file1Proof1.ownership.should.eq(proof1.ownership);
-      file1Proof1.quality.should.eq(proof1.quality);
-      file1Proof1.uniqueness.should.eq(proof1.uniqueness);
+      const file1Proof1 = await fileRegistry.fileProofs(1, 1);
+      file1Proof1.signature.should.eq(proof1.signature);
+      file1Proof1.data.score.should.eq(proof1.data.score);
+      file1Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file1Proof1.data.metadata.should.eq(proof1.data.metadata);
+      file1Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
+      file1Proof1.data.instruction.should.eq(proof1.data.instruction);
     });
 
     it("should addProof, one file, multiple tee", async function () {
       await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }]);
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee2, key: "key2" }]);
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
-      const proof2 = {
-        valid: false,
-        score: 6n,
-        authenticity: 7n,
-        ownership: 8n,
-        quality: 9n,
-        uniqueness: 10n,
-      };
 
       await fileRegistry
         .connect(tee1)
@@ -759,52 +392,27 @@ describe("FileRegistry", () => {
         .should.emit(fileRegistry, "ProofAdded")
         .withArgs(1, tee2);
 
-      const file1Proof1 = await fileRegistry.fileProofs(1, tee1);
-      file1Proof1.valid.should.eq(proof1.valid);
-      file1Proof1.score.should.eq(proof1.score);
-      file1Proof1.authenticity.should.eq(proof1.authenticity);
-      file1Proof1.ownership.should.eq(proof1.ownership);
-      file1Proof1.quality.should.eq(proof1.quality);
-      file1Proof1.uniqueness.should.eq(proof1.uniqueness);
+      const file1Proof1 = await fileRegistry.fileProofs(1, 1);
+      file1Proof1.signature.should.eq(proof1.signature);
+      file1Proof1.data.score.should.eq(proof1.data.score);
+      file1Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file1Proof1.data.metadata.should.eq(proof1.data.metadata);
+      file1Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
+      file1Proof1.data.instruction.should.eq(proof1.data.instruction);
 
-      const file1Proof2 = await fileRegistry.fileProofs(1, tee2);
-      file1Proof2.valid.should.eq(proof2.valid);
-      file1Proof2.score.should.eq(proof2.score);
-      file1Proof2.authenticity.should.eq(proof2.authenticity);
-      file1Proof2.ownership.should.eq(proof2.ownership);
-      file1Proof2.quality.should.eq(proof2.quality);
-      file1Proof2.uniqueness.should.eq(proof2.uniqueness);
+      const file1Proof2 = await fileRegistry.fileProofs(1, 2);
+      file1Proof2.signature.should.eq(proof2.signature);
+      file1Proof2.data.score.should.eq(proof2.data.score);
+      file1Proof2.data.timestamp.should.eq(proof2.data.timestamp);
+      file1Proof2.data.metadata.should.eq(proof2.data.metadata);
+      file1Proof2.data.proofUrl.should.eq(proof2.data.proofUrl);
+      file1Proof2.data.instruction.should.eq(proof2.data.instruction);
     });
 
     it("should addProof, multiple files, one tee", async function () {
       await fileRegistry.connect(user1).addFile("file1");
       await fileRegistry.connect(user2).addFile("file2");
       await fileRegistry.connect(user1).addFile("file3");
-
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(2, [{ account: tee1, key: "key1" }]);
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(3, [{ account: tee1, key: "key2" }]);
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
-      const proof2 = {
-        valid: false,
-        score: 6n,
-        authenticity: 7n,
-        ownership: 8n,
-        quality: 9n,
-        uniqueness: 10n,
-      };
 
       await fileRegistry
         .connect(tee1)
@@ -817,21 +425,29 @@ describe("FileRegistry", () => {
         .should.emit(fileRegistry, "ProofAdded")
         .withArgs(3, tee1);
 
-      const file1Proof1 = await fileRegistry.fileProofs(1, tee1);
-      file1Proof1.valid.should.eq(false);
-      file1Proof1.score.should.eq(0);
-      file1Proof1.authenticity.should.eq(0);
-      file1Proof1.ownership.should.eq(0);
-      file1Proof1.quality.should.eq(0);
-      file1Proof1.uniqueness.should.eq(0);
+      const file1Proof1 = await fileRegistry.fileProofs(1, 1);
+      file1Proof1.signature.should.eq("0x");
+      file1Proof1.data.score.should.eq(0);
+      file1Proof1.data.timestamp.should.eq(0);
+      file1Proof1.data.metadata.should.eq("");
+      file1Proof1.data.proofUrl.should.eq("");
+      file1Proof1.data.instruction.should.eq("");
 
-      const file2Proof1 = await fileRegistry.fileProofs(2, tee1);
-      file2Proof1.valid.should.eq(proof1.valid);
-      file2Proof1.score.should.eq(proof1.score);
-      file2Proof1.authenticity.should.eq(proof1.authenticity);
-      file2Proof1.ownership.should.eq(proof1.ownership);
-      file2Proof1.quality.should.eq(proof1.quality);
-      file2Proof1.uniqueness.should.eq(proof1.uniqueness);
+      const file2Proof1 = await fileRegistry.fileProofs(2, 1);
+      file2Proof1.signature.should.eq(proof1.signature);
+      file2Proof1.data.score.should.eq(proof1.data.score);
+      file2Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file2Proof1.data.metadata.should.eq(proof1.data.metadata);
+      file2Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
+      file2Proof1.data.instruction.should.eq(proof1.data.instruction);
+
+      const file3Proof1 = await fileRegistry.fileProofs(3, 1);
+      file3Proof1.signature.should.eq(proof2.signature);
+      file3Proof1.data.score.should.eq(proof2.data.score);
+      file3Proof1.data.timestamp.should.eq(proof2.data.timestamp);
+      file3Proof1.data.metadata.should.eq(proof2.data.metadata);
+      file3Proof1.data.proofUrl.should.eq(proof2.data.proofUrl);
+      file3Proof1.data.instruction.should.eq(proof2.data.instruction);
     });
 
     it("should addProof, multiple files, multiple tees", async function () {
@@ -842,162 +458,64 @@ describe("FileRegistry", () => {
       await fileRegistry.connect(user2).addFile("file5");
       await fileRegistry.connect(user2).addFile("file6");
 
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(2, [{ account: tee1, key: "key1" }]);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee1, key: "key2" }]);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee2, key: "key3" }]);
-      await fileRegistry
-        .connect(user3)
-        .addPermissions(3, [{ account: tee3, key: "key4" }]);
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(6, [{ account: tee2, key: "key5" }]);
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
-      const proof2 = {
-        valid: false,
-        score: 6n,
-        authenticity: 7n,
-        ownership: 8n,
-        quality: 9n,
-        uniqueness: 10n,
-      };
-
-      const proof3 = {
-        valid: true,
-        score: 11n,
-        authenticity: 12n,
-        ownership: 13n,
-        quality: 14n,
-        uniqueness: 15n,
-      };
-
-      const proof4 = {
-        valid: false,
-        score: 16n,
-        authenticity: 17n,
-        ownership: 18n,
-        quality: 19n,
-        uniqueness: 20n,
-      };
-
-      const proof5 = {
-        valid: true,
-        score: 21n,
-        authenticity: 22n,
-        ownership: 23n,
-        quality: 24n,
-        uniqueness: 25n,
-      };
-
-      await fileRegistry
-        .connect(tee1)
-        .addProof(2, proof1)
-        .should.emit(fileRegistry, "ProofAdded")
-        .withArgs(2, tee1);
+      await fileRegistry.connect(tee1).addProof(2, proof1);
       await fileRegistry.connect(tee1).addProof(3, proof2);
       await fileRegistry.connect(tee2).addProof(3, proof3);
       await fileRegistry.connect(tee3).addProof(3, proof4);
       await fileRegistry.connect(tee2).addProof(6, proof5);
 
-      const file1Proof1 = await fileRegistry.fileProofs(1, tee1);
-      file1Proof1.valid.should.eq(false);
-      file1Proof1.score.should.eq(0);
-      file1Proof1.authenticity.should.eq(0);
-      file1Proof1.ownership.should.eq(0);
-      file1Proof1.quality.should.eq(0);
-      file1Proof1.uniqueness.should.eq(0);
+      const file1Proof1 = await fileRegistry.fileProofs(1, 1);
+      file1Proof1.signature.should.eq("0x");
+      file1Proof1.data.score.should.eq(0);
+      file1Proof1.data.timestamp.should.eq(0);
+      file1Proof1.data.metadata.should.eq("");
+      file1Proof1.data.proofUrl.should.eq("");
+      file1Proof1.data.instruction.should.eq("");
 
-      const file2Proof1 = await fileRegistry.fileProofs(2, tee1);
-      file2Proof1.valid.should.eq(proof1.valid);
-      file2Proof1.score.should.eq(proof1.score);
-      file2Proof1.authenticity.should.eq(proof1.authenticity);
-      file2Proof1.ownership.should.eq(proof1.ownership);
-      file2Proof1.quality.should.eq(proof1.quality);
-      file2Proof1.uniqueness.should.eq(proof1.uniqueness);
+      const file2Proof1 = await fileRegistry.fileProofs(2, 1);
+      file2Proof1.signature.should.eq(proof1.signature);
+      file2Proof1.data.score.should.eq(proof1.data.score);
+      file2Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file2Proof1.data.metadata.should.eq(proof1.data.metadata);
+      file2Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
+      file2Proof1.data.instruction.should.eq(proof1.data.instruction);
 
-      const file3Proof1 = await fileRegistry.fileProofs(3, tee1);
-      file3Proof1.valid.should.eq(proof2.valid);
-      file3Proof1.score.should.eq(proof2.score);
-      file3Proof1.authenticity.should.eq(proof2.authenticity);
-      file3Proof1.ownership.should.eq(proof2.ownership);
-      file3Proof1.quality.should.eq(proof2.quality);
-      file3Proof1.uniqueness.should.eq(proof2.uniqueness);
+      const file3Proof1 = await fileRegistry.fileProofs(3, 1);
+      file3Proof1.signature.should.eq(proof2.signature);
+      file3Proof1.data.score.should.eq(proof2.data.score);
+      file3Proof1.data.timestamp.should.eq(proof2.data.timestamp);
+      file3Proof1.data.metadata.should.eq(proof2.data.metadata);
+      file3Proof1.data.proofUrl.should.eq(proof2.data.proofUrl);
+      file3Proof1.data.instruction.should.eq(proof2.data.instruction);
 
-      const file3Proof2 = await fileRegistry.fileProofs(3, tee2);
-      file3Proof2.valid.should.eq(proof3.valid);
-      file3Proof2.score.should.eq(proof3.score);
-      file3Proof2.authenticity.should.eq(proof3.authenticity);
-      file3Proof2.ownership.should.eq(proof3.ownership);
-      file3Proof2.quality.should.eq(proof3.quality);
-      file3Proof2.uniqueness.should.eq(proof3.uniqueness);
+      const file3Proof2 = await fileRegistry.fileProofs(3, 2);
+      file3Proof2.signature.should.eq(proof3.signature);
+      file3Proof2.data.score.should.eq(proof3.data.score);
+      file3Proof2.data.timestamp.should.eq(proof3.data.timestamp);
+      file3Proof2.data.metadata.should.eq(proof3.data.metadata);
+      file3Proof2.data.proofUrl.should.eq(proof3.data.proofUrl);
+      file3Proof2.data.instruction.should.eq(proof3.data.instruction);
 
-      const file3Proof3 = await fileRegistry.fileProofs(3, tee3);
-      file3Proof3.valid.should.eq(proof4.valid);
-      file3Proof3.score.should.eq(proof4.score);
-      file3Proof3.authenticity.should.eq(proof4.authenticity);
-      file3Proof3.ownership.should.eq(proof4.ownership);
-      file3Proof3.quality.should.eq(proof4.quality);
-      file3Proof3.uniqueness.should.eq(proof4.uniqueness);
+      const file3Proof3 = await fileRegistry.fileProofs(3, 3);
+      file3Proof3.signature.should.eq(proof4.signature);
+      file3Proof3.data.score.should.eq(proof4.data.score);
+      file3Proof3.data.timestamp.should.eq(proof4.data.timestamp);
+      file3Proof3.data.metadata.should.eq(proof4.data.metadata);
+      file3Proof3.data.proofUrl.should.eq(proof4.data.proofUrl);
+      file3Proof3.data.instruction.should.eq(proof4.data.instruction);
 
-      const file6Proof1 = await fileRegistry.fileProofs(6, tee2);
-      file6Proof1.valid.should.eq(proof5.valid);
-      file6Proof1.score.should.eq(proof5.score);
-      file6Proof1.authenticity.should.eq(proof5.authenticity);
-      file6Proof1.ownership.should.eq(proof5.ownership);
-      file6Proof1.quality.should.eq(proof5.quality);
-      file6Proof1.uniqueness.should.eq(proof5.uniqueness);
-    });
-
-    it("should reject addProof when non-authorised tee", async function () {
-      await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }]);
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
-      await fileRegistry
-        .connect(tee2)
-        .addProof(1, proof1)
-        .should.be.rejectedWith("NotFileAttestator()");
+      const file6Proof1 = await fileRegistry.fileProofs(6, 1);
+      file6Proof1.signature.should.eq(proof5.signature);
+      file6Proof1.data.score.should.eq(proof5.data.score);
+      file6Proof1.data.timestamp.should.eq(proof5.data.timestamp);
+      file6Proof1.data.metadata.should.eq(proof5.data.metadata);
+      file6Proof1.data.proofUrl.should.eq(proof5.data.proofUrl);
+      file6Proof1.data.instruction.should.eq(proof5.data.instruction);
     });
 
     it("should reject addProof when paused", async function () {
       await fileRegistry.connect(user1).addFile("file1");
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }]);
       await fileRegistry.connect(owner).pause();
-
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
 
       await fileRegistry
         .connect(tee1)

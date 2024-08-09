@@ -172,7 +172,7 @@ contract TeePoolImplementation is
             revert JobCompleted();
         }
 
-        fileRegistry.addProofOrigin(job.fileId, proof);
+        fileRegistry.addProof(job.fileId, proof);
 
         _tees[msg.sender].amount += job.bidAmount;
         job.status = JobStatus.Completed;
