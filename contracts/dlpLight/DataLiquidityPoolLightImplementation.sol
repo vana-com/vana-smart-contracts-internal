@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -11,13 +10,10 @@ import "./interfaces/DataLiquidityPoolLightStorageV1.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-import "hardhat/console.sol";
-
 contract DataLiquidityPoolLightImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
-    AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
     DataLiquidityPoolLightStorageV1
 {
@@ -39,11 +35,18 @@ contract DataLiquidityPoolLightImplementation is
     event FileAdded(address indexed contributorAddress, uint256 fileId);
 
     /**
-     * @notice Triggered when the fileRewardDelay has been updated
+     * @notice Triggered when a file has been validated
      *
-     * @param newFileRewardDelay                new file reward delay
+     * @param fileId                             file id
      */
-    event FileRewardDelayUpdated(uint256 newFileRewardDelay);
+    event FileValidated(uint256 indexed fileId);
+
+    /**
+     * @notice Triggered when a file has been invalidated
+     *
+     * @param fileId                             file id
+     */
+    event FileInvalidated(uint256 indexed fileId);
 
     /**
      * @notice Triggered when the fileRewardFactor has been updated
@@ -52,32 +55,18 @@ contract DataLiquidityPoolLightImplementation is
      */
     event FileRewardFactorUpdated(uint256 newFileRewardFactor);
 
-    /**
-     * @notice Triggered when a data contributor has claimed a reward
-     *
-     * @param contributorAddress                 address of the contributor
-     * @param fileId                             file id
-     * @param amount                             amount claimed
-     */
-    event ContributionRewardClaimed(address indexed contributorAddress, uint256 fileId, uint256 amount);
-
     error WithdrawNotAllowed();
-    error MasterKeyAlreadySet();
     error FileAlreadyAdded();
-    error InvalidFileId();
-    error ArityMismatch();
-    error NotFileOwner();
+    error InvalidFileStatus();
     error NotAllowed();
-    error NothingToClaim();
 
     struct InitParams {
         address ownerAddress;
         string name;
-        address fileRegistryAddress;
+        address dataRegistryAddress;
         address tokenAddress;
         string masterKey;
         uint256 fileRewardFactor;
-        uint256 fileRewardDelay;
     }
 
     /**
@@ -90,14 +79,12 @@ contract DataLiquidityPoolLightImplementation is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __AccessControl_init();
 
         name = params.name;
-        fileRegistry = IFileRegistry(params.fileRegistryAddress);
+        dataRegistry = IDataRegistry(params.dataRegistryAddress);
         token = IERC20(params.tokenAddress);
         masterKey = params.masterKey;
         fileRewardFactor = params.fileRewardFactor;
-        fileRewardDelay = params.fileRewardDelay;
 
         _transferOwnership(params.ownerAddress);
     }
@@ -118,13 +105,6 @@ contract DataLiquidityPoolLightImplementation is
     }
 
     /**
-     * @notice Get the number of files
-     */
-    function filesCount() external view override returns (uint256) {
-        return _fileUrlHashes.length();
-    }
-
-    /**
      * @notice Get the file information
      *
      * @param fileId                              file id
@@ -135,6 +115,7 @@ contract DataLiquidityPoolLightImplementation is
         return
             FileResponse({
                 fileId: fileId,
+                status: file.status,
                 registryId: file.registryId,
                 timestamp: file.timestamp,
                 proofIndex: file.proofIndex,
@@ -206,41 +187,26 @@ contract DataLiquidityPoolLightImplementation is
         emit FileRewardFactorUpdated(newFileRewardFactor);
     }
 
-    /**
-     * @notice Update the fileRewardDelay
-     *
-     * @param newFileRewardDelay                new file reward delay
-     */
-    function updateFileRewardDelay(uint256 newFileRewardDelay) external override onlyOwner {
-        fileRewardDelay = newFileRewardDelay;
-
-        emit FileRewardDelayUpdated(newFileRewardDelay);
-    }
-
     function addFile(uint256 registryId, uint256 proofIndex) external override whenNotPaused {
-        bytes32 urlHash = keccak256(abi.encodePacked(registryId));
-        if (_fileUrlHashes.contains(urlHash)) {
-            revert FileAlreadyAdded();
-        }
+        filesCount++;
 
-        _fileUrlHashes.add(urlHash);
-        uint256 fileId = _fileUrlHashes.length();
-
-        File storage file = _files[fileId];
+        File storage file = _files[filesCount];
         file.registryId = registryId;
         file.timestamp = block.timestamp;
         file.proofIndex = proofIndex;
+        file.status = FileStatus.Added;
+        file.rewardAmount = (fileRewardFactor * dataRegistry.fileProofs(registryId, proofIndex).data.score) / 1e18;
 
         ContributorInfo storage contributor = _contributorInfo[msg.sender];
         contributor.fileIdsCount++;
-        contributor.fileIds[contributor.fileIdsCount] = fileId;
+        contributor.fileIds[contributor.fileIdsCount] = filesCount;
 
         if (contributor.fileIdsCount == 1) {
             contributorsCount++;
             _contributors[contributorsCount] = msg.sender;
         }
 
-        emit FileAdded(msg.sender, fileId);
+        emit FileAdded(msg.sender, filesCount);
     }
 
     /**
@@ -251,29 +217,48 @@ contract DataLiquidityPoolLightImplementation is
         totalContributorsRewardAmount += contributorsRewardAmount;
     }
 
-    function claimContributionReward(uint256 fileId) external override {
+    /**
+     * @notice Validate file and send the contribution reward
+     *
+     * @param fileId                             file id
+     */
+    function validateFile(uint256 fileId) external override onlyOwner {
         File storage file = _files[fileId];
 
-        //        if (file.ownerAddress != msg.sender) {
-        //            revert NotFileOwner();
-        //        }
+        if (file.status != FileStatus.Added) {
+            revert InvalidFileStatus();
+        }
 
-        if (
-            file.rewardWithdrawn > 0 ||
-            file.timestamp + fileRewardDelay > block.timestamp ||
-            totalContributorsRewardAmount < file.rewardAmount
-        ) {
+        if (file.rewardWithdrawn > 0 || totalContributorsRewardAmount < file.rewardAmount) {
             revert WithdrawNotAllowed();
         }
 
+        file.status = FileStatus.Validated;
         file.rewardWithdrawn = file.rewardAmount;
         token.safeTransfer(msg.sender, file.rewardAmount);
 
-        emit ContributionRewardClaimed(msg.sender, fileId, file.rewardAmount);
+        emit FileValidated(fileId);
+    }
+
+    /**
+     * @notice Invalidate file
+     *
+     * @param fileId                             file id
+     */
+    function invalidateFile(uint256 fileId) external override onlyOwner {
+        File storage file = _files[fileId];
+
+        if (file.status != FileStatus.Added) {
+            revert InvalidFileStatus();
+        }
+
+        file.status = FileStatus.Rejected;
+
+        emit FileInvalidated(fileId);
     }
 
     function testSignature(uint256 fileId, uint256 proofIndex) external view returns (address) {
-        IFileRegistry.Proof memory fileProof = fileRegistry.fileProofs(fileId, proofIndex);
+        IDataRegistry.Proof memory fileProof = dataRegistry.fileProofs(fileId, proofIndex);
 
         bytes32 _messageHash = keccak256(
             abi.encodePacked(

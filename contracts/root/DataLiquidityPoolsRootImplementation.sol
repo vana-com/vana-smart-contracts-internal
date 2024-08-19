@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,7 +13,6 @@ contract DataLiquidityPoolsRootImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
-    AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
     DataLiquidityPoolsRootStorageV1
 {
@@ -124,8 +122,24 @@ contract DataLiquidityPoolsRootImplementation is
      * @notice Triggered when epoch performances have been saved
      *
      * @param epochId                         epoch id
+     * @param isFinal                           true if the performances are final
      */
-    event EpochPerformancesSaved(uint256 epochId);
+    event EpochPerformancesSaved(uint256 epochId, bool isFinal);
+
+    /**
+     * @notice Triggered when the performance percentages has been updated
+     *
+     * @param newTtfPercentage                new ttf percentage
+     * @param newTfcPercentage                new tfc percentage
+     * @param newVduPercentage                new vdu percentage
+     * @param newUwPercentage                 new uw percentage
+     */
+    event PerformancePercentagesUpdated(
+        uint256 newTtfPercentage,
+        uint256 newTfcPercentage,
+        uint256 newVduPercentage,
+        uint256 newUwPercentage
+    );
 
     error InvalidStakeAmount();
     error InvalidUnstakeAmount();
@@ -137,8 +151,11 @@ contract DataLiquidityPoolsRootImplementation is
     error NotAllowed();
     error InvalidPerformances();
     error NothingToClaim();
-    error CurrentEpochNotInitialized();
+    error CurrentEpochNotCreated();
     error EpochPerformancesAlreadySet();
+    error InvalidPerformancePercentages();
+    error NextEpochCannotBeCreated();
+    error InvalidEpochStatus();
 
     /**
      * @dev Modifier to make a function callable only when the caller is the owner of the dlp
@@ -152,20 +169,24 @@ contract DataLiquidityPoolsRootImplementation is
         _;
     }
 
-    modifier whenActiveCurrentEpoch() {
+    modifier whenCurrentEpoch() {
         if (_epochs[epochsCount].endBlock < block.number) {
-            revert CurrentEpochNotInitialized();
+            revert CurrentEpochNotCreated();
         }
         _;
     }
 
     struct InitParams {
         address payable ownerAddress;
-        uint256 newMaxNumberOfDlps;
-        uint256 newMinDlpStakeAmount;
+        uint256 maxNumberOfDlps;
+        uint256 minDlpStakeAmount;
         uint256 startBlock;
-        uint256 newEpochSize;
-        uint256 newEpochRewardAmount;
+        uint256 epochSize;
+        uint256 epochRewardAmount;
+        uint256 ttfPercentage;
+        uint256 tfcPercentage;
+        uint256 vduPercentage;
+        uint256 uwPercentage;
     }
 
     /**
@@ -178,16 +199,25 @@ contract DataLiquidityPoolsRootImplementation is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __AccessControl_init();
 
-        maxNumberOfDlps = params.newMaxNumberOfDlps;
-        minDlpStakeAmount = params.newMinDlpStakeAmount;
-        epochSize = params.newEpochSize;
-        epochRewardAmount = params.newEpochRewardAmount;
+        maxNumberOfDlps = params.maxNumberOfDlps;
+        minDlpStakeAmount = params.minDlpStakeAmount;
+        epochSize = params.epochSize;
+        epochRewardAmount = params.epochRewardAmount;
+
+        ttfPercentage = params.ttfPercentage;
+        tfcPercentage = params.tfcPercentage;
+        vduPercentage = params.vduPercentage;
+        uwPercentage = params.uwPercentage;
+
+        if (ttfPercentage + tfcPercentage + vduPercentage + uwPercentage != 100e18) {
+            revert InvalidPerformancePercentages();
+        }
 
         Epoch storage epoch0 = _epochs[0];
-        epoch0.startBlock = Math.min(params.startBlock - 1, block.number);
+        epoch0.startBlock = Math.min(params.startBlock - 2, block.number);
         epoch0.endBlock = params.startBlock - 1;
+        epoch0.status = EpochStatus.Finished;
 
         _transferOwnership(params.ownerAddress);
     }
@@ -343,8 +373,7 @@ contract DataLiquidityPoolsRootImplementation is
      *
      * @param newEpochRewardAmount                new epoch size
      */
-    function updateEpochRewardAmount(uint256 newEpochRewardAmount) external override onlyOwner {
-        createEpochs();
+    function updateEpochRewardAmount(uint256 newEpochRewardAmount) external override whenCurrentEpoch onlyOwner {
         epochRewardAmount = newEpochRewardAmount;
 
         emit EpochRewardAmountUpdated(newEpochRewardAmount);
@@ -362,44 +391,62 @@ contract DataLiquidityPoolsRootImplementation is
     }
 
     /**
+     * @notice Update the performance percentages
+     *
+     * @param newTtfPercentage                new ttf percentage
+     * @param newTfcPercentage                new tfc percentage
+     * @param newVduPercentage                new vdu percentage
+     * @param newUwPercentage                 new uw percentage
+     */
+    function updatePerformancePercentages(
+        uint256 newTtfPercentage,
+        uint256 newTfcPercentage,
+        uint256 newVduPercentage,
+        uint256 newUwPercentage
+    ) external override onlyOwner {
+        if (newTtfPercentage + newTfcPercentage + newVduPercentage + newUwPercentage != 100e18) {
+            revert InvalidPerformancePercentages();
+        }
+
+        ttfPercentage = newTtfPercentage;
+        tfcPercentage = newTfcPercentage;
+        vduPercentage = newVduPercentage;
+        uwPercentage = newUwPercentage;
+
+        emit PerformancePercentagesUpdated(newTtfPercentage, newTfcPercentage, newVduPercentage, newUwPercentage);
+    }
+
+    /**
      * @notice Register a dlp
      *
      * @param dlpAddress                   address of the dlp
      * @param dlpOwnerAddress              owner of the dlp
-     * @param granted                      if the dlp is granted
      */
     function registerDlp(
         address dlpAddress,
-        address payable dlpOwnerAddress,
-        bool granted
-    ) external payable override whenNotPaused nonReentrant whenActiveCurrentEpoch {
-        if (dlpIds[dlpAddress] != 0) {
-            revert InvalidDlpStatus();
-        }
+        address payable dlpOwnerAddress
+    ) external payable override whenNotPaused nonReentrant whenCurrentEpoch {
+        _registerDlp(dlpAddress, dlpOwnerAddress, false);
+    }
 
-        dlpsCount++;
-        Dlp storage dlp = _dlps[dlpsCount];
+    /**
+     * @notice Register a dlp with grant
+     *
+     * @param dlpAddress                   address of the dlp
+     * @param dlpOwnerAddress              owner of the dlp
+     */
+    function registerDlpWithGrant(
+        address dlpAddress,
+        address payable dlpOwnerAddress
+    ) external payable override whenNotPaused nonReentrant whenCurrentEpoch {
+        _registerDlp(dlpAddress, dlpOwnerAddress, true);
+    }
 
-        if (msg.value < minDlpStakeAmount) {
-            revert InvalidStakeAmount();
-        }
-
-        if (granted) {
-            dlp.grantedAmount = msg.value;
-        }
-
-        dlp.id = dlpsCount;
-        dlp.ownerAddress = dlpOwnerAddress;
-        dlp.dlpAddress = dlpAddress;
-        dlp.status = DlpStatus.Registered;
-
-        dlpIds[dlpAddress] = dlpsCount;
-
-        _addStake(dlpOwnerAddress, dlpsCount, msg.value);
-
-        _registeredDlps.add(dlpsCount);
-
-        emit DlpRegistered(dlpsCount, dlpAddress, dlpOwnerAddress);
+    function updateDlpStakersPercentage(
+        uint256 dlpId,
+        uint256 stakersPercentage
+    ) external override onlyDlpOwner(dlpId) whenCurrentEpoch {
+        _dlps[dlpId].stakersPercentage = stakersPercentage;
     }
 
     /**
@@ -407,7 +454,7 @@ contract DataLiquidityPoolsRootImplementation is
      *
      * @param dlpId                        dlp id
      */
-    function deregisterDlp(uint256 dlpId) external override onlyDlpOwner(dlpId) nonReentrant whenActiveCurrentEpoch {
+    function deregisterDlp(uint256 dlpId) external override onlyDlpOwner(dlpId) nonReentrant whenCurrentEpoch {
         Dlp storage dlp = _dlps[dlpId];
 
         _deregisterDlp(dlpId);
@@ -423,8 +470,10 @@ contract DataLiquidityPoolsRootImplementation is
      * @param dlpId                             dlp id
      * @param unstakeAmount                     amount to sent to dlp owner
      */
-    function deregisterDlpByOwner(uint256 dlpId, uint256 unstakeAmount) external override onlyOwner nonReentrant {
-        createEpochs();
+    function deregisterDlpByOwner(
+        uint256 dlpId,
+        uint256 unstakeAmount
+    ) external override nonReentrant whenCurrentEpoch onlyOwner {
         Dlp storage dlp = _dlps[dlpId];
 
         if (unstakeAmount > dlp.stakeAmount) {
@@ -462,60 +511,56 @@ contract DataLiquidityPoolsRootImplementation is
         emit DlpDeregisteredByOwner(dlpId, unstakeAmount, penaltyAmount);
     }
 
-    /**
-     * @notice Create epochs
-     * used when the last epoch has ended
-     */
-    function createEpochs() public override {
-        createEpochsUntilBlockNumber(block.number);
-    }
-
-    /**
-     * @notice Create epochs
-     * used when the last epoch has ended
-     */
-    function createEpochsUntilBlockNumber(uint256 blockNumber) public override {
+    function createNextEpoch() public override {
         Epoch storage lastEpoch = _epochs[epochsCount];
 
-        if (lastEpoch.endBlock >= blockNumber) {
+        if (lastEpoch.endBlock > block.number) {
             return;
         }
 
-        uint256 epochCountTemp = epochsCount;
-
-        while (lastEpoch.endBlock < blockNumber) {
-            epochCountTemp++;
-            Epoch storage newEpoch = _epochs[epochCountTemp];
-
-            newEpoch.startBlock = lastEpoch.endBlock + 1;
-            newEpoch.endBlock = newEpoch.startBlock + epochSize - 1;
-            newEpoch.reward = epochRewardAmount;
-
-            lastEpoch = newEpoch;
-
-            uint256 index;
-            uint256[] memory topDlps = getTopDlpsIds(maxNumberOfDlps);
-            for (index = 0; index < topDlps.length; index++) {
-                newEpoch.dlpIds.add(topDlps[index]);
-                newEpoch.dlps[topDlps[index]].stakedAmount = _dlps[topDlps[index]].stakeAmount;
-            }
-
-            emit EpochCreated(epochCountTemp);
+        if (epochsCount > 0 && _epochs[epochsCount - 1].status != EpochStatus.Finished) {
+            revert NextEpochCannotBeCreated();
         }
 
-        epochsCount = epochCountTemp;
+        epochsCount++;
+
+        Epoch storage newEpoch = _epochs[epochsCount];
+
+        newEpoch.startBlock = lastEpoch.endBlock + 1;
+        newEpoch.endBlock = newEpoch.startBlock + epochSize - 1;
+        newEpoch.reward = epochRewardAmount;
+        newEpoch.status = EpochStatus.Created;
+
+        uint256 index;
+        uint256[] memory topDlps = getTopDlpsIds(maxNumberOfDlps);
+        for (index = 0; index < topDlps.length; index++) {
+            newEpoch.dlpIds.add(topDlps[index]);
+            newEpoch.dlps[topDlps[index]].stakedAmount = _dlps[topDlps[index]].stakeAmount;
+            newEpoch.dlps[topDlps[index]].stakersPercentage = _dlps[topDlps[index]].stakersPercentage;
+        }
+
+        emit EpochCreated(epochsCount);
     }
 
     /**
-     * @notice Saves the performances of DLPs for a specific epoch
+     * @notice Saves the performances of top DLPs for a specific epoch
      *
      * @param epochId             The ID of the epoch
      * @param dlpPerformances     An array of DLPPerformance structs containing the performance metrics of the DLPs
      */
     function saveEpochPerformances(
         uint256 epochId,
-        DlpPerformance[] memory dlpPerformances
+        DlpPerformance[] memory dlpPerformances,
+        bool isFinal
     ) external override onlyOwner {
+        createNextEpoch();
+
+        Epoch storage epoch = _epochs[epochId];
+
+        if (epoch.status != EpochStatus.Created) {
+            revert InvalidEpochStatus();
+        }
+
         EnumerableSet.UintSet storage epochDlpIds = _epochs[epochId].dlpIds;
         uint256 epochDlpsCount = epochDlpIds.length();
 
@@ -524,7 +569,6 @@ contract DataLiquidityPoolsRootImplementation is
         }
 
         uint256 i;
-        Epoch storage epoch = _epochs[epochId];
         EpochDlp storage epochDlp;
 
         uint256 totalScore;
@@ -542,13 +586,13 @@ contract DataLiquidityPoolsRootImplementation is
 
             totalScore +=
                 dlpPerformances[i].ttf *
-                15 +
+                ttfPercentage +
                 dlpPerformances[i].tfc *
-                15 +
+                tfcPercentage +
                 dlpPerformances[i].vdu *
-                50 +
+                vduPercentage +
                 dlpPerformances[i].uw *
-                20;
+                uwPercentage;
         }
 
         if (totalScore == 0) {
@@ -564,17 +608,27 @@ contract DataLiquidityPoolsRootImplementation is
 
             epochDlp.rewardAmount =
                 ((dlpPerformances[i].ttf *
-                    15 +
+                    ttfPercentage +
                     dlpPerformances[i].tfc *
-                    15 +
+                    tfcPercentage +
                     dlpPerformances[i].vdu *
-                    50 +
+                    vduPercentage +
                     dlpPerformances[i].uw *
-                    20) * epoch.reward) /
+                    uwPercentage) * epoch.reward) /
                 totalScore;
+
+            if (epochDlp.stakersPercentage < 100e18) {
+                payable(_dlps[dlpPerformances[i].dlpId].ownerAddress).transfer(
+                    (epochDlp.rewardAmount * (100e18 - epochDlp.stakersPercentage)) / 100e18
+                );
+            }
         }
 
-        emit EpochPerformancesSaved(epochId);
+        if (isFinal) {
+            epoch.status = EpochStatus.Finished;
+        }
+
+        emit EpochPerformancesSaved(epochId, isFinal);
     }
 
     /**
@@ -605,7 +659,8 @@ contract DataLiquidityPoolsRootImplementation is
         Epoch storage epoch = _epochs[epochNumber];
         EpochDlp storage epochDlp = epoch.dlps[dlpId];
 
-        uint256 rewardAmount = (stakedAmountBeforeCurrentEpoch * epochDlpReward) / epochDlp.stakedAmount;
+        uint256 rewardAmount = (((stakedAmountBeforeCurrentEpoch * epochDlpReward) / epochDlp.stakedAmount) *
+            epochDlp.stakersPercentage) / 100e18;
 
         stakerDlpEpoch.withdrawnReward = rewardAmount;
 
@@ -614,12 +669,22 @@ contract DataLiquidityPoolsRootImplementation is
         emit EpochRewardClaimed(msg.sender, epochNumber, dlpId, rewardAmount);
     }
 
-    function stake(uint256 dlpId) external payable override whenActiveCurrentEpoch {
+    function stake(uint256 dlpId) external payable override whenCurrentEpoch {
         _addStake(msg.sender, dlpId, msg.value);
     }
 
-    function unstake(uint256 dlpId, uint256 amount) external override whenActiveCurrentEpoch {
-        if (amount > _stakers[msg.sender].dlps[dlpId].stakedAmount) {
+    function unstake(uint256 dlpId, uint256 amount) external override whenCurrentEpoch {
+        StakerDlp storage stakerDlp = _stakers[msg.sender].dlps[dlpId];
+        if (amount > stakerDlp.stakedAmount) {
+            revert InvalidUnstakeAmount();
+        }
+
+        Dlp storage dlp = _dlps[dlpId];
+
+        if (
+            msg.sender == dlp.ownerAddress &&
+            (stakerDlp.stakedAmount - amount < dlp.grantedAmount || stakerDlp.stakedAmount - amount < minDlpStakeAmount)
+        ) {
             revert InvalidUnstakeAmount();
         }
 
@@ -648,8 +713,6 @@ contract DataLiquidityPoolsRootImplementation is
     }
 
     function _deregisterDlp(uint256 dlpId) internal {
-        createEpochs();
-
         Dlp storage dlp = _dlps[dlpId];
 
         if (dlp.status != DlpStatus.Registered) {
@@ -774,5 +837,35 @@ contract DataLiquidityPoolsRootImplementation is
         }
 
         return topDlpIds;
+    }
+
+    function _registerDlp(address dlpAddress, address payable dlpOwnerAddress, bool granted) internal {
+        if (dlpIds[dlpAddress] != 0) {
+            revert InvalidDlpStatus();
+        }
+
+        dlpsCount++;
+        Dlp storage dlp = _dlps[dlpsCount];
+
+        if (msg.value < minDlpStakeAmount) {
+            revert InvalidStakeAmount();
+        }
+
+        if (granted) {
+            dlp.grantedAmount = msg.value;
+        }
+
+        dlp.id = dlpsCount;
+        dlp.ownerAddress = dlpOwnerAddress;
+        dlp.dlpAddress = dlpAddress;
+        dlp.status = DlpStatus.Registered;
+
+        dlpIds[dlpAddress] = dlpsCount;
+
+        _addStake(dlpOwnerAddress, dlpsCount, msg.value);
+
+        _registeredDlps.add(dlpsCount);
+
+        emit DlpRegistered(dlpsCount, dlpAddress, dlpOwnerAddress);
     }
 }

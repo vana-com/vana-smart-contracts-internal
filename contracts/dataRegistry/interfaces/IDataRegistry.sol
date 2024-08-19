@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/IAccessControl.sol";
-
-interface IFileRegistry is IAccessControl {
+interface IDataRegistry {
     struct ProofData {
         uint256 score;
         uint256 timestamp;
@@ -23,6 +21,7 @@ interface IFileRegistry is IAccessControl {
         uint256 addedAtBlock;
         uint256 proofsCount;
         mapping(uint256 => Proof) proofs;
+        mapping(address => string) permissions;
     }
 
     struct FileResponse {
@@ -36,8 +35,10 @@ interface IFileRegistry is IAccessControl {
     function filesCount() external view returns (uint256);
     function files(uint256 index) external view returns (FileResponse memory);
     function fileProofs(uint256 fileId, uint256 index) external view returns (Proof memory);
+    function filePermissions(uint256 fileId, address account) external view returns (string memory);
     function pause() external;
     function unpause() external;
     function addFile(string memory url) external returns (uint256);
     function addProof(uint256 fileId, Proof memory proof) external;
+    function addFilePermission(uint256 fileId, address account, string memory key) external;
 }

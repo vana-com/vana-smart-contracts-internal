@@ -3,20 +3,16 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "./interfaces/FileRegistryStorageV1.sol";
+import "./interfaces/DataRegistryStorageV1.sol";
 
-import "hardhat/console.sol";
-
-contract FileRegistryImplementation is
+contract DataRegistryImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
-    AccessControlUpgradeable,
-    FileRegistryStorageV1
+    DataRegistryStorageV1
 {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
@@ -34,9 +30,17 @@ contract FileRegistryImplementation is
      * @notice Triggered when user has added an proof to the file
      *
      * @param fileId                            id of the file
+     * @param proofIndex                        index of the proof
+     */
+    event ProofAdded(uint256 indexed fileId, uint256 indexed proofIndex);
+
+    /**
+     * @notice Triggered when user has authorized an account to access the file
+     *
+     * @param fileId                            id of the file
      * @param account                        address of the account
      */
-    event ProofAdded(uint256 indexed fileId, address indexed account);
+    event PermissionGranted(uint256 indexed fileId, address indexed account);
 
     error NotFileOwner();
 
@@ -49,7 +53,6 @@ contract FileRegistryImplementation is
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
-        __AccessControl_init();
 
         _transferOwnership(ownerAddress);
     }
@@ -96,17 +99,26 @@ contract FileRegistryImplementation is
             FileResponse({id: fileId, url: file.url, ownerAddress: file.ownerAddress, addedAtBlock: file.addedAtBlock});
     }
 
+    /**
+     * @notice Returns the proof of the file
+     *
+     * @param fileId                            id of the file
+     * @param index                             index of the proof
+     * @return Proof                            proof of the file
+     */
     function fileProofs(uint256 fileId, uint256 index) external view override returns (Proof memory) {
         return _files[fileId].proofs[index];
-        //        return
-        //            Proof({
-        //                valid: _files[fileId].proofs[account].valid,
-        //                score: _files[fileId].proofs[account].score,
-        //                authenticity: _files[fileId].proofs[account].authenticity,
-        //                ownership: _files[fileId].proofs[account].ownership,
-        //                quality: _files[fileId].proofs[account].quality,
-        //                uniqueness: _files[fileId].proofs[account].uniqueness
-        //            });
+    }
+
+    /**
+     * @notice Returns permissions for the file
+     *
+     * @param fileId                            id of the file
+     * @param account                        address of the account
+     * @return string                           key for the account
+     */
+    function filePermissions(uint256 fileId, address account) external view override returns (string memory) {
+        return _files[fileId].permissions[account];
     }
 
     /**
@@ -128,20 +140,26 @@ contract FileRegistryImplementation is
      * @param proof                       proof for the file
      */
     function addProof(uint256 fileId, Proof memory proof) external override whenNotPaused {
-        _addProof(msg.sender, fileId, proof);
-    }
-
-    /**
-     * @notice Adds an proof to the file
-     *
-     * @param fileId                            id of the file
-     * @param proof                       proof for the file
-     */
-    function _addProof(address account, uint256 fileId, Proof memory proof) internal {
         _files[fileId].proofsCount++;
         _files[fileId].proofs[_files[fileId].proofsCount] = proof;
 
-        emit ProofAdded(fileId, account);
+        emit ProofAdded(fileId, _files[fileId].proofsCount);
+    }
+
+    /**
+     * @notice Adds permissions for accounts to access the file
+     *
+     * @param fileId                            id of the file
+     * @param account                           address of the account
+     * @param key                               encryption key for the account
+     */
+    function addFilePermission(uint256 fileId, address account, string memory key) external override whenNotPaused {
+        if (msg.sender != _files[fileId].ownerAddress) {
+            revert NotFileOwner();
+        }
+
+        _files[fileId].permissions[account] = key;
+        emit PermissionGranted(fileId, account);
     }
 
     /**

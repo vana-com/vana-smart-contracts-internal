@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import {FileRegistryImplementation} from "../../fileRegistry/FileRegistryImplementation.sol";
+import {DataRegistryImplementation} from "../../dataRegistry/DataRegistryImplementation.sol";
 
-contract FileRegistryImplementationV2Mock is FileRegistryImplementation {
+contract DataRegistryImplementationV2Mock is DataRegistryImplementation {
     /**
      * @notice Upgrade the contract
      * This function is required by OpenZeppelin's UUPSUpgradeable

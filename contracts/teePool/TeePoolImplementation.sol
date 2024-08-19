@@ -7,6 +7,8 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/TeePoolStorageV1.sol";
 
+import "hardhat/console.sol";
+
 contract TeePoolImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
@@ -34,6 +36,8 @@ contract TeePoolImplementation is
     error TeeNotActive();
     error JobCompleted();
     error NothingToClaim();
+    error InsufficientFee();
+    error NoActiveTee();
 
     modifier onlyActiveTee() {
         if (!(_tees[msg.sender].status == TeeStatus.Active)) {
@@ -47,13 +51,13 @@ contract TeePoolImplementation is
      *
      * @param ownerAddress                      address of the owner
      */
-    function initialize(address ownerAddress, address fileRegistryAddress) external initializer {
+    function initialize(address ownerAddress, address dataRegistryAddress) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
 
-        fileRegistry = IFileRegistry(fileRegistryAddress);
+        dataRegistry = IDataRegistry(dataRegistryAddress);
 
         _transferOwnership(ownerAddress);
     }
@@ -73,48 +77,92 @@ contract TeePoolImplementation is
         return 1;
     }
 
+    /**
+     * @notice Returns the details of the job
+     *
+     * @param jobId                             id of the job
+     * @return Job                              details of the job
+     */
     function jobs(uint256 jobId) external view override returns (Job memory) {
         return _jobs[jobId];
-        //        return JobResponse({
-        //            fileId: _jobs[jobId].fileId,
-        //            bidAmount: _jobs[jobId].bidAmount,
-        //            teeAddress: _jobs[jobId].teeAddress,
-        //            proofsCount: 0
-        //        });
     }
 
-    function tees(address teeAddress) public view override returns (TeeInfo memory) {
+    /**
+     * @notice Returns the details of the tee
+     *
+     * @param teeAddress                        address of the tee
+     * @return TeeDetails                       details of the tee
+     */
+    function tees(address teeAddress) public view override returns (TeeDetails memory) {
         return
-            TeeInfo({
+            TeeDetails({
                 teeAddress: teeAddress,
+                url: _tees[teeAddress].url,
                 status: _tees[teeAddress].status,
                 amount: _tees[teeAddress].amount,
                 withdrawnAmount: _tees[teeAddress].withdrawnAmount
             });
     }
 
+    /**
+     * @notice Returns the number of tees
+     */
     function teesCount() external view override returns (uint256) {
         return _teeList.length();
     }
 
+    /**
+     * @notice Returns the list of tees
+     */
     function teeList() external view override returns (address[] memory) {
         return _teeList.values();
     }
 
-    function teeListAt(uint256 index) external view override returns (TeeInfo memory) {
+    /**
+     * @notice Returns the details of the tee at the given index
+     *
+     * @param index                             index of the tee
+     * @return TeeDetails                       details of the tee
+     */
+    function teeListAt(uint256 index) external view override returns (TeeDetails memory) {
         return tees(_teeList.at(index));
     }
 
+    /**
+     * @notice Returns the number of active tees
+     */
     function activeTeesCount() external view override returns (uint256) {
         return _activeTeeList.length();
     }
 
+    /**
+     * @notice Returns the list of active tees
+     */
     function activeTeeList() external view override returns (address[] memory) {
         return _activeTeeList.values();
     }
 
-    function activeTeeListAt(uint256 index) external view override returns (TeeInfo memory) {
+    /**
+     * @notice Returns the details of the active tee at the given index
+     *
+     * @param index                             index of the tee
+     * @return TeeDetails                       details of the tee
+     */
+    function activeTeeListAt(uint256 index) external view override returns (TeeDetails memory) {
         return tees(_activeTeeList.at(index));
+    }
+
+    /**
+     * @notice Returns details of the tee for the given job
+     *
+     * @param jobId                             id of the job
+     * @return TeeDetails                       details of the tee
+     */
+    function jobTee(uint256 jobId) external view override returns (TeeDetails memory) {
+        if (_activeTeeList.length() == 0) {
+            revert NoActiveTee();
+        }
+        return tees(_activeTeeList.at(jobId % _activeTeeList.length()));
     }
 
     /**
@@ -131,21 +179,47 @@ contract TeePoolImplementation is
         _unpause();
     }
 
-    function updateFileRegistry(IFileRegistry newFileRegistry) external override onlyOwner {
-        fileRegistry = newFileRegistry;
+    /**
+     * @notice Updates the file registry
+     *
+     * @param newDataRegistry                   new file registry
+     */
+    function updateDataRegistry(IDataRegistry newDataRegistry) external override onlyOwner {
+        dataRegistry = newDataRegistry;
     }
 
-    function addTee(address teeAddress) external override onlyOwner {
+    /**
+     * @notice Updates the tee fee
+     *
+     * @param newTeeFee                         new fee
+     */
+    function updateTeeFee(uint256 newTeeFee) external override onlyOwner {
+        teeFee = newTeeFee;
+    }
+
+    /**
+     * @notice Adds a tee to the pool
+     *
+     * @param teeAddress                        address of the tee
+     * @param url                               url of the tee
+     */
+    function addTee(address teeAddress, string memory url) external override onlyOwner {
         if (_activeTeeList.contains(teeAddress)) {
             revert TeeAlreadyAdded();
         }
         _teeList.add(teeAddress);
         _activeTeeList.add(teeAddress);
         _tees[teeAddress].status = TeeStatus.Active;
+        _tees[teeAddress].url = url;
 
         emit TeeAdded(teeAddress);
     }
 
+    /**
+     * @notice Removes a tee from the pool
+     *
+     * @param teeAddress                        address of the tee
+     */
     function removeTee(address teeAddress) external override onlyOwner {
         if (!_activeTeeList.contains(teeAddress)) {
             revert TeeNotActive();
@@ -157,7 +231,16 @@ contract TeePoolImplementation is
         emit TeeRemoved(teeAddress);
     }
 
-    function submitValidationJob(uint256 fileId) external payable override {
+    /**
+     * @notice Request a contribution proof
+     *
+     * @param fileId                            id of the file
+     */
+    function requestContributionProof(uint256 fileId) external payable override {
+        if (msg.value < teeFee) {
+            revert InsufficientFee();
+        }
+
         jobsCount++;
         _jobs[jobsCount].fileId = fileId;
         _jobs[jobsCount].bidAmount = msg.value;
@@ -165,14 +248,20 @@ contract TeePoolImplementation is
         emit JobSubmitted(jobsCount, fileId, msg.value);
     }
 
-    function submitProof(uint256 jobId, IFileRegistry.Proof memory proof) external payable override onlyActiveTee {
+    /**
+     * @notice Adds a proof to the file
+     *
+     * @param jobId                             id of the job
+     * @param proof                             proof for the file
+     */
+    function addProof(uint256 jobId, IDataRegistry.Proof memory proof) external payable override onlyActiveTee {
         Job storage job = _jobs[jobId];
 
         if (job.status != JobStatus.None) {
             revert JobCompleted();
         }
 
-        fileRegistry.addProof(job.fileId, proof);
+        dataRegistry.addProof(job.fileId, proof);
 
         _tees[msg.sender].amount += job.bidAmount;
         job.status = JobStatus.Completed;
@@ -180,6 +269,9 @@ contract TeePoolImplementation is
         emit ProofAdded(msg.sender, jobId, job.fileId);
     }
 
+    /**
+     * @notice method used by tees for claiming their rewards
+     */
     function claim() external nonReentrant {
         uint256 amount = _tees[msg.sender].amount - _tees[msg.sender].withdrawnAmount;
 

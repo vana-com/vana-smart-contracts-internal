@@ -2,12 +2,12 @@ import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
 import {
-  FileRegistryImplementation,
+  DataRegistryImplementation,
   TeePoolImplementation,
 } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getReceipt, parseEther } from "../utils/helpers";
-import { deployFileRegistry } from "./fileRegistry";
+import { deployDataRegistry, proofs } from "./dataRegistry";
 
 chai.use(chaiAsPromised);
 should();
@@ -23,7 +23,7 @@ describe("TeePool", () => {
   let user3: HardhatEthersSigner;
 
   let teePool: TeePoolImplementation;
-  let fileRegistry: FileRegistryImplementation;
+  let dataRegistry: DataRegistryImplementation;
 
   enum TeeStatus {
     None = 0,
@@ -39,11 +39,11 @@ describe("TeePool", () => {
     [deployer, owner, tee1, tee2, tee3, user1, user2, user3] =
       await ethers.getSigners();
 
-    fileRegistry = await deployFileRegistry(owner);
+    dataRegistry = await deployDataRegistry(owner);
 
     const teePoolDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("TeePoolImplementation"),
-      [owner.address, fileRegistry.target],
+      [owner.address, dataRegistry.target],
       {
         kind: "uups",
       },
@@ -62,8 +62,9 @@ describe("TeePool", () => {
 
     it("should have correct params after deploy", async function () {
       (await teePool.owner()).should.eq(owner);
-      (await teePool.fileRegistry()).should.eq(fileRegistry);
+      (await teePool.dataRegistry()).should.eq(dataRegistry);
       (await teePool.version()).should.eq(1);
+      (await teePool.teeFee()).should.eq(0);
     });
 
     it("Should transferOwnership in 2 steps", async function () {
@@ -114,17 +115,33 @@ describe("TeePool", () => {
         );
     });
 
-    it("Should updateFileRegistry when owner", async function () {
-      await teePool.connect(owner).updateFileRegistry(user1.address).should.be
+    it("Should updateDataRegistry when owner", async function () {
+      await teePool.connect(owner).updateDataRegistry(user1.address).should.be
         .fulfilled;
 
-      (await teePool.fileRegistry()).should.eq(user1.address);
+      (await teePool.dataRegistry()).should.eq(user1.address);
     });
 
-    it("Should reject updateFileRegistry when non-owner", async function () {
+    it("Should reject updateDataRegistry when non-owner", async function () {
       await teePool
         .connect(user1)
-        .updateFileRegistry(user2.address)
+        .updateDataRegistry(user2.address)
+        .should.be.rejectedWith(
+          `OwnableUnauthorizedAccount("${user1.address}")`,
+        );
+    });
+
+    it("Should updateTeeFee when owner", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1)).should.be
+        .fulfilled;
+
+      (await teePool.teeFee()).should.eq(parseEther(0.1));
+    });
+
+    it("Should reject updateTeeFee when non-owner", async function () {
+      await teePool
+        .connect(user1)
+        .updateTeeFee(parseEther(0.2))
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${user1.address}")`,
         );
@@ -201,7 +218,7 @@ describe("TeePool", () => {
 
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
@@ -211,6 +228,7 @@ describe("TeePool", () => {
       tee1Info.status.should.eq(TeeStatus.Active);
       tee1Info.amount.should.eq(0);
       tee1Info.withdrawnAmount.should.eq(0);
+      tee1Info.url.should.eq("tee1Url");
 
       (await teePool.teeListAt(0)).should.deep.eq(tee1Info);
       (await teePool.activeTeeListAt(0)).should.deep.eq(tee1Info);
@@ -224,7 +242,7 @@ describe("TeePool", () => {
 
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
@@ -232,7 +250,7 @@ describe("TeePool", () => {
 
       await teePool
         .connect(owner)
-        .addTee(tee2)
+        .addTee(tee2, "tee2Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee2);
 
@@ -243,11 +261,13 @@ describe("TeePool", () => {
       tee1Info.status.should.eq(TeeStatus.Active);
       tee1Info.amount.should.eq(0);
       tee1Info.withdrawnAmount.should.eq(0);
+      tee1Info.url.should.eq("tee1Url");
 
       const tee2Info = await teePool.tees(tee2.address);
       tee2Info.status.should.eq(TeeStatus.Active);
       tee2Info.amount.should.eq(0);
       tee2Info.withdrawnAmount.should.eq(0);
+      tee2Info.url.should.eq("tee2Url");
 
       (await teePool.teeListAt(0)).should.deep.eq(tee1Info);
       (await teePool.activeTeeListAt(0)).should.deep.eq(tee1Info);
@@ -265,20 +285,20 @@ describe("TeePool", () => {
     it("should reject addTee when already added", async function () {
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.be.rejectedWith("TeeAlreadyAdded");
     });
 
     it("should reject addTee when non-owner", async function () {
       await teePool
         .connect(user1)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${user1.address}")`,
         );
@@ -287,7 +307,7 @@ describe("TeePool", () => {
     it("should removeTee when owner #1", async function () {
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
@@ -303,6 +323,7 @@ describe("TeePool", () => {
       tee1Info.status.should.eq(TeeStatus.Removed);
       tee1Info.amount.should.eq(0);
       tee1Info.withdrawnAmount.should.eq(0);
+      tee1Info.url.should.eq("tee1Url");
 
       (await teePool.teeListAt(0)).should.deep.eq(tee1Info);
 
@@ -313,19 +334,19 @@ describe("TeePool", () => {
     it("should removeTee when multiple tees", async function () {
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
       await teePool
         .connect(owner)
-        .addTee(tee2)
+        .addTee(tee2, "tee2Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee2);
 
       await teePool
         .connect(owner)
-        .addTee(tee3)
+        .addTee(tee3, "tee3Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee3);
 
@@ -341,6 +362,7 @@ describe("TeePool", () => {
       tee2Info.status.should.eq(TeeStatus.Removed);
       tee2Info.amount.should.eq(0);
       tee2Info.withdrawnAmount.should.eq(0);
+      tee2Info.url.should.eq("tee2Url");
 
       (await teePool.teeListAt(1)).should.deep.eq(tee2Info);
 
@@ -358,7 +380,7 @@ describe("TeePool", () => {
     it("should reject removeTee when non-owner", async function () {
       await teePool
         .connect(owner)
-        .addTee(tee1)
+        .addTee(tee1, "tee1Url")
         .should.emit(teePool, "TeeAdded")
         .withArgs(tee1);
 
@@ -383,14 +405,14 @@ describe("TeePool", () => {
       await deploy();
     });
 
-    it("should submitValidationJob", async function () {
+    it("should requestContributionProof", async function () {
       const user1InitialBalance = await ethers.provider.getBalance(
         user1.address,
       );
 
       const tx = await teePool
         .connect(user1)
-        .submitValidationJob(1, { value: parseEther(0.01) });
+        .requestContributionProof(1, { value: parseEther(0.01) });
       const receipt = await getReceipt(tx);
 
       await tx.should
@@ -408,17 +430,17 @@ describe("TeePool", () => {
       );
     });
 
-    it("should submitValidationJob #same user multiple files", async function () {
+    it("should requestContributionProof #same user multiple files", async function () {
       const user1InitialBalance = await ethers.provider.getBalance(user1);
 
       const tx1 = await teePool
         .connect(user1)
-        .submitValidationJob(1, { value: parseEther(0.01) });
+        .requestContributionProof(1, { value: parseEther(0.01) });
       const receipt1 = await getReceipt(tx1);
 
       const tx2 = await teePool
         .connect(user1)
-        .submitValidationJob(123, { value: parseEther(0.02) });
+        .requestContributionProof(123, { value: parseEther(0.02) });
       const receipt2 = await getReceipt(tx2);
 
       (await teePool.jobsCount()).should.eq(2);
@@ -439,18 +461,18 @@ describe("TeePool", () => {
       );
     });
 
-    it("should submitValidationJob for same file #multiple users same file", async function () {
+    it("should requestContributionProof for same file #multiple users same file", async function () {
       const user1InitialBalance = await ethers.provider.getBalance(user1);
       const user2InitialBalance = await ethers.provider.getBalance(user2);
 
       const tx1 = await teePool
         .connect(user1)
-        .submitValidationJob(1, { value: parseEther(0.01) });
+        .requestContributionProof(1, { value: parseEther(0.01) });
       const receipt1 = await getReceipt(tx1);
 
       const tx2 = await teePool
         .connect(user2)
-        .submitValidationJob(1, { value: parseEther(0.02) });
+        .requestContributionProof(1, { value: parseEther(0.02) });
       const receipt2 = await getReceipt(tx2);
 
       (await teePool.jobsCount()).should.eq(2);
@@ -472,16 +494,16 @@ describe("TeePool", () => {
       );
     });
 
-    it("should submitValidationJob #multiple users multiple files", async function () {
+    it("should requestContributionProof #multiple users multiple files", async function () {
       await teePool
         .connect(owner)
-        .submitValidationJob(1, { value: parseEther(0.01) })
+        .requestContributionProof(1, { value: parseEther(0.01) })
         .should.emit(teePool, "JobSubmitted")
         .withArgs(1, 1, parseEther(0.01));
 
       await teePool
         .connect(user1)
-        .submitValidationJob(123, { value: parseEther(0.02) })
+        .requestContributionProof(123, { value: parseEther(0.02) })
         .should.emit(teePool, "JobSubmitted")
         .withArgs(2, 123, parseEther(0.02));
 
@@ -496,10 +518,12 @@ describe("TeePool", () => {
       job2.fileId.should.eq(123);
     });
 
-    it("should submitValidationJob without bid", async function () {
+    it("should requestContributionProof without bid when teeFee = 0", async function () {
+      (await teePool.teeFee()).should.eq(0);
+
       await teePool
         .connect(owner)
-        .submitValidationJob(1)
+        .requestContributionProof(1)
         .should.emit(teePool, "JobSubmitted")
         .withArgs(1, 1, 0);
 
@@ -509,90 +533,68 @@ describe("TeePool", () => {
       job1.bidAmount.should.eq(0);
       job1.fileId.should.eq(1);
     });
+
+    it("should reject requestContributionProof when insufficient fee", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.01));
+
+      await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.001) })
+        .should.be.rejectedWith("InsufficientFee()");
+    });
   });
 
   describe("Proof", () => {
-    const proofDefault = {
-      valid: true,
-      score: 1n,
-      authenticity: 2n,
-      ownership: 3n,
-      quality: 4n,
-      uniqueness: 5n,
-    };
-
     beforeEach(async () => {
       await deploy();
 
-      await teePool.connect(owner).addTee(tee1);
-      await teePool.connect(owner).addTee(tee2);
-      await teePool.connect(owner).addTee(tee3);
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
 
-      await fileRegistry.connect(user1).addFile("file1"); //fileId = 1
-      await fileRegistry.connect(user1).addFile("file2"); //fileId = 2
-      await fileRegistry.connect(user1).addFile("file3"); //fileId = 3 - no job for this file
-      await fileRegistry.connect(user2).addFile("file4"); //fileId = 4
-      await fileRegistry.connect(user2).addFile("file5"); //fileId = 5
-      await fileRegistry.connect(user3).addFile("file6"); //fileId = 6
-
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee1, key: "key1" }]);
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(1, [{ account: tee2, key: "key2" }]);
-      await fileRegistry
-        .connect(user1)
-        .addPermissions(2, [{ account: tee1, key: "key3" }]);
-      await fileRegistry
-        .connect(user2)
-        .addPermissions(4, [{ account: tee3, key: "key4" }]);
+      await dataRegistry.connect(user1).addFile("file1"); //fileId = 1
+      await dataRegistry.connect(user1).addFile("file2"); //fileId = 2
+      await dataRegistry.connect(user1).addFile("file3"); //fileId = 3 - no job for this file
+      await dataRegistry.connect(user2).addFile("file4"); //fileId = 4
+      await dataRegistry.connect(user2).addFile("file5"); //fileId = 5
+      await dataRegistry.connect(user3).addFile("file6"); //fileId = 6
 
       await teePool
         .connect(user1)
-        .submitValidationJob(1, { value: parseEther(0.01) });
+        .requestContributionProof(1, { value: parseEther(0.01) });
       await teePool
         .connect(user1)
-        .submitValidationJob(2, { value: parseEther(0.03) });
+        .requestContributionProof(2, { value: parseEther(0.03) });
       await teePool
         .connect(user1)
-        .submitValidationJob(4, { value: parseEther(0.05) });
+        .requestContributionProof(4, { value: parseEther(0.05) });
       await teePool
         .connect(user1)
-        .submitValidationJob(5, { value: parseEther(0.07) });
+        .requestContributionProof(5, { value: parseEther(0.07) });
       await teePool
         .connect(user1)
-        .submitValidationJob(6, { value: parseEther(0.09) });
+        .requestContributionProof(6, { value: parseEther(0.09) });
     });
 
     it("should addProof", async function () {
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
       await teePool
         .connect(tee1)
-        .submitProof(1, proof1)
+        .addProof(1, proofs[1])
         .should.emit(teePool, "ProofAdded")
         .withArgs(tee1.address, 1, 1)
-        .and.to.emit(fileRegistry, "ProofAdded")
-        .withArgs(1, tee1.address);
+        .and.to.emit(dataRegistry, "ProofAdded")
+        .withArgs(1, 1);
 
       const job1 = await teePool.jobs(1);
       job1.status.should.eq(JobStatus.Completed);
 
-      const proof1Info = await fileRegistry.fileProofs(1, tee1.address);
-      proof1Info.valid.should.eq(proof1.valid);
-      proof1Info.score.should.eq(proof1.score);
-      proof1Info.authenticity.should.eq(proof1.authenticity);
-      proof1Info.ownership.should.eq(proof1.ownership);
-      proof1Info.quality.should.eq(proof1.quality);
-      proof1Info.uniqueness.should.eq(proof1.uniqueness);
+      const proof1Info = await dataRegistry.fileProofs(1, 1);
+      proof1Info.signature.should.eq(proofs[1].signature);
+      proof1Info.data.score.should.eq(proofs[1].data.score);
+      proof1Info.data.timestamp.should.eq(proofs[1].data.timestamp);
+      proof1Info.data.metadata.should.eq(proofs[1].data.metadata);
+      proof1Info.data.proofUrl.should.eq(proofs[1].data.proofUrl);
+      proof1Info.data.instruction.should.eq(proofs[1].data.instruction);
 
       const tee1Info = await teePool.tees(tee1.address);
       tee1Info.amount.should.eq(parseEther(0.01));
@@ -601,7 +603,7 @@ describe("TeePool", () => {
     it("should reject addProof when not tee", async function () {
       await teePool
         .connect(user1)
-        .submitProof(1, proofDefault)
+        .addProof(1, proofs[1])
         .should.be.rejectedWith("TeeNotActive()");
     });
 
@@ -609,103 +611,61 @@ describe("TeePool", () => {
       await teePool.connect(owner).removeTee(tee1);
       await teePool
         .connect(tee1)
-        .submitProof(2, proofDefault)
+        .addProof(2, proofs[1])
         .should.be.rejectedWith("TeeNotActive()");
     });
 
-    it("should reject addProof when not authorized", async function () {
-      await teePool
-        .connect(tee3)
-        .submitProof(1, proofDefault)
-        .should.be.rejectedWith("NotFileAttestator()");
-    });
-
-    it("should reject addProof when not job", async function () {
-      await teePool
-        .connect(tee1)
-        .submitProof(123, proofDefault)
-        .should.be.rejectedWith("NotFileAttestator()");
-    });
-
     it("should reject addProof when proof already submitted", async function () {
-      await teePool.connect(tee1).submitProof(1, proofDefault).should.be
-        .fulfilled;
+      await teePool.connect(tee1).addProof(1, proofs[1]).should.be.fulfilled;
 
       await teePool
         .connect(tee1)
-        .submitProof(1, proofDefault)
+        .addProof(1, proofs[1])
         .should.be.rejectedWith("JobCompleted()");
     });
 
     it("should addProof for multiple files", async function () {
-      const proof1 = {
-        valid: true,
-        score: 1n,
-        authenticity: 2n,
-        ownership: 3n,
-        quality: 4n,
-        uniqueness: 5n,
-      };
-
-      const proof2 = {
-        valid: true,
-        score: 6n,
-        authenticity: 6n,
-        ownership: 8n,
-        quality: 9n,
-        uniqueness: 10n,
-      };
-
-      const proof3 = {
-        valid: false,
-        score: 11n,
-        authenticity: 12n,
-        ownership: 13n,
-        quality: 14n,
-        uniqueness: 15n,
-      };
-
       await teePool
         .connect(tee1)
-        .submitProof(1, proof1)
+        .addProof(1, proofs[1])
         .should.emit(teePool, "ProofAdded")
         .withArgs(tee1.address, 1, 1);
 
       await teePool
         .connect(tee1)
-        .submitProof(2, proof2)
+        .addProof(2, proofs[2])
         .should.emit(teePool, "ProofAdded")
         .withArgs(tee1.address, 2, 2);
 
       await teePool
         .connect(tee3)
-        .submitProof(3, proof3)
+        .addProof(3, proofs[3])
         .should.emit(teePool, "ProofAdded")
         .withArgs(tee3.address, 3, 4);
 
-      const proof1Info = await fileRegistry.fileProofs(1, tee1.address);
-      proof1Info.valid.should.eq(proof1.valid);
-      proof1Info.score.should.eq(proof1.score);
-      proof1Info.authenticity.should.eq(proof1.authenticity);
-      proof1Info.ownership.should.eq(proof1.ownership);
-      proof1Info.quality.should.eq(proof1.quality);
-      proof1Info.uniqueness.should.eq(proof1.uniqueness);
+      const proof1Info = await dataRegistry.fileProofs(1, 1);
+      proof1Info.signature.should.eq(proofs[1].signature);
+      proof1Info.data.score.should.eq(proofs[1].data.score);
+      proof1Info.data.timestamp.should.eq(proofs[1].data.timestamp);
+      proof1Info.data.metadata.should.eq(proofs[1].data.metadata);
+      proof1Info.data.proofUrl.should.eq(proofs[1].data.proofUrl);
+      proof1Info.data.instruction.should.eq(proofs[1].data.instruction);
 
-      const proof2Info = await fileRegistry.fileProofs(2, tee1.address);
-      proof2Info.valid.should.eq(proof2.valid);
-      proof2Info.score.should.eq(proof2.score);
-      proof2Info.authenticity.should.eq(proof2.authenticity);
-      proof2Info.ownership.should.eq(proof2.ownership);
-      proof2Info.quality.should.eq(proof2.quality);
-      proof2Info.uniqueness.should.eq(proof2.uniqueness);
+      const proof2Info = await dataRegistry.fileProofs(2, 1);
+      proof2Info.signature.should.eq(proofs[2].signature);
+      proof2Info.data.score.should.eq(proofs[2].data.score);
+      proof2Info.data.timestamp.should.eq(proofs[2].data.timestamp);
+      proof2Info.data.metadata.should.eq(proofs[2].data.metadata);
+      proof2Info.data.proofUrl.should.eq(proofs[2].data.proofUrl);
+      proof2Info.data.instruction.should.eq(proofs[2].data.instruction);
 
-      const proof3Info = await fileRegistry.fileProofs(4, tee3.address);
-      proof3Info.valid.should.eq(proof3.valid);
-      proof3Info.score.should.eq(proof3.score);
-      proof3Info.authenticity.should.eq(proof3.authenticity);
-      proof3Info.ownership.should.eq(proof3.ownership);
-      proof3Info.quality.should.eq(proof3.quality);
-      proof3Info.uniqueness.should.eq(proof3.uniqueness);
+      const proof3Info = await dataRegistry.fileProofs(4, 1);
+      proof3Info.signature.should.eq(proofs[3].signature);
+      proof3Info.data.score.should.eq(proofs[3].data.score);
+      proof3Info.data.timestamp.should.eq(proofs[3].data.timestamp);
+      proof3Info.data.metadata.should.eq(proofs[3].data.metadata);
+      proof3Info.data.proofUrl.should.eq(proofs[3].data.proofUrl);
+      proof3Info.data.instruction.should.eq(proofs[3].data.instruction);
 
       const tee1Info = await teePool.tees(tee1);
       tee1Info.amount.should.eq(parseEther(0.01) + parseEther(0.03));
@@ -714,9 +674,9 @@ describe("TeePool", () => {
       tee3Info.amount.should.eq(parseEther(0.05));
     });
 
-    describe("Withdraw", () => {
-      it("should withdraw", async function () {
-        await teePool.connect(tee1).submitProof(1, proofDefault);
+    describe("Claim", () => {
+      it("should claim", async function () {
+        await teePool.connect(tee1).addProof(1, proofs[1]);
 
         const tee1InitialBalance = await ethers.provider.getBalance(tee1);
         const teePoolInitialBalance = await ethers.provider.getBalance(teePool);
@@ -745,7 +705,7 @@ describe("TeePool", () => {
       });
 
       it("should reject withdraw when not tee", async function () {
-        await teePool.connect(tee1).submitProof(1, proofDefault);
+        await teePool.connect(tee1).addProof(1, proofs[1]);
 
         await teePool
           .connect(user1)
@@ -761,7 +721,7 @@ describe("TeePool", () => {
       });
 
       it("should reject claim when already claimed", async function () {
-        await teePool.connect(tee1).submitProof(1, proofDefault);
+        await teePool.connect(tee1).addProof(1, proofs[1]);
         await teePool.connect(tee1).claim().should.be.fulfilled;
         await teePool
           .connect(tee1)
@@ -777,7 +737,7 @@ describe("TeePool", () => {
         tee1Info1.amount.should.eq(parseEther(0));
         tee1Info1.withdrawnAmount.should.eq(0);
 
-        const tx1 = await teePool.connect(tee1).submitProof(1, proofDefault);
+        const tx1 = await teePool.connect(tee1).addProof(1, proofs[1]);
         const receipt1 = await getReceipt(tx1);
 
         const tee1Info2 = await teePool.tees(tee1.address);
@@ -804,7 +764,7 @@ describe("TeePool", () => {
           teePoolInitialBalance - parseEther(0.01),
         );
 
-        const tx3 = await teePool.connect(tee1).submitProof(2, proofDefault);
+        const tx3 = await teePool.connect(tee1).addProof(2, proofs[1]);
         const receipt3 = await getReceipt(tx3);
 
         const tee1Info4 = await teePool.tees(tee1.address);
@@ -835,6 +795,278 @@ describe("TeePool", () => {
           teePoolInitialBalance - parseEther(0.01) - parseEther(0.03),
         );
       });
+    });
+  });
+
+  describe("jobTee", () => {
+    beforeEach(async () => {
+      await deploy();
+    });
+
+    it("should get jobTee, one tee, one job", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee1);
+    });
+
+    it("should get jobTee, one tees, multiple jobs", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee1);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee1);
+    });
+
+    it("should get jobTee, multiple tees, multiple jobs #1", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee2);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee1);
+    });
+
+    it("should get jobTee, multiple tees, multiple jobs #2", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee2);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee1);
+
+      const job3Tee = await teePool.jobTee(3);
+      job3Tee.teeAddress.should.eq(tee2);
+
+      const job4Tee = await teePool.jobTee(4);
+      job4Tee.teeAddress.should.eq(tee1);
+
+      const job5Tee = await teePool.jobTee(5);
+      job5Tee.teeAddress.should.eq(tee2);
+    });
+
+    it("should get jobTee, multiple tees, multiple jobs #3", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee2);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee3);
+
+      const job3Tee = await teePool.jobTee(3);
+      job3Tee.teeAddress.should.eq(tee1);
+
+      const job4Tee = await teePool.jobTee(4);
+      job4Tee.teeAddress.should.eq(tee2);
+
+      const job5Tee = await teePool.jobTee(5);
+      job5Tee.teeAddress.should.eq(tee3);
+    });
+
+    it("should reject get jobTee, no tee", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+
+      await teePool.jobTee(1).should.be.rejectedWith("NoActiveTee()");
+    });
+
+    it("should get jobTee after tee removal, one tee, one job", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      await teePool.connect(owner).removeTee(tee1);
+      await teePool.connect(owner).removeTee(tee2);
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee3);
+    });
+
+    it("should get jobTee after tee removal, one tees, multiple jobs", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+
+      await teePool.connect(owner).removeTee(tee1);
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee2);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee2);
+    });
+
+    it("should get jobTee after tee removal, multiple tees, multiple jobs #1", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      await teePool.connect(owner).removeTee(tee2);
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee3);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee1);
+    });
+
+    it("should get jobTee after tee removal, multiple tees, multiple jobs #2", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      await teePool.connect(owner).removeTee(tee1);
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee2);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee3);
+
+      const job3Tee = await teePool.jobTee(3);
+      job3Tee.teeAddress.should.eq(tee2);
+
+      const job4Tee = await teePool.jobTee(4);
+      job4Tee.teeAddress.should.eq(tee3);
+
+      const job5Tee = await teePool.jobTee(5);
+      job5Tee.teeAddress.should.eq(tee2);
+    });
+
+    it("should get jobTee after tee removal, multiple tees, multiple jobs #3", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(user1, "user1Url");
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      await teePool.connect(owner).removeTee(user1);
+
+      const job1Tee = await teePool.jobTee(1);
+      job1Tee.teeAddress.should.eq(tee1);
+
+      const job2Tee = await teePool.jobTee(2);
+      job2Tee.teeAddress.should.eq(tee2);
+
+      const job3Tee = await teePool.jobTee(3);
+      job3Tee.teeAddress.should.eq(tee3);
+
+      const job4Tee = await teePool.jobTee(4);
+      job4Tee.teeAddress.should.eq(tee1);
+
+      const job5Tee = await teePool.jobTee(5);
+      job5Tee.teeAddress.should.eq(tee2);
+    });
+
+    it("should reject get jobTee after tee removal, no tee", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.01) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+
+      await teePool.connect(owner).removeTee(tee1);
+      await teePool.connect(owner).removeTee(tee2);
+
+      await teePool.jobTee(1).should.be.rejectedWith("NoActiveTee()");
+    });
+
+    it("should get same jobTee", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(user1, "user1Url");
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      await teePool.connect(owner).removeTee(user1);
+
+      (await teePool.jobTee(1)).teeAddress.should.eq(tee1);
+      (await teePool.jobTee(2)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(3)).teeAddress.should.eq(tee3);
+      (await teePool.jobTee(4)).teeAddress.should.eq(tee1);
+      (await teePool.jobTee(5)).teeAddress.should.eq(tee2);
+
+      (await teePool.jobTee(1)).teeAddress.should.eq(tee1);
+      (await teePool.jobTee(2)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(3)).teeAddress.should.eq(tee3);
+      (await teePool.jobTee(4)).teeAddress.should.eq(tee1);
+      (await teePool.jobTee(5)).teeAddress.should.eq(tee2);
+    });
+
+    it("should get different jobTee after tee removal", async function () {
+      await teePool.requestContributionProof(1, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(2, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(3, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(4, { value: parseEther(0.02) });
+      await teePool.requestContributionProof(5, { value: parseEther(0.02) });
+
+      await teePool.connect(owner).addTee(tee1, "tee1Url");
+      await teePool.connect(owner).addTee(tee2, "tee2Url");
+      await teePool.connect(owner).addTee(tee3, "tee3Url");
+
+      (await teePool.jobTee(1)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(2)).teeAddress.should.eq(tee3);
+      (await teePool.jobTee(3)).teeAddress.should.eq(tee1);
+      (await teePool.jobTee(4)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(5)).teeAddress.should.eq(tee3);
+
+      await teePool.connect(owner).removeTee(tee1);
+
+      (await teePool.jobTee(1)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(2)).teeAddress.should.eq(tee3);
+      (await teePool.jobTee(3)).teeAddress.should.eq(tee2);
+      (await teePool.jobTee(4)).teeAddress.should.eq(tee3);
+      (await teePool.jobTee(5)).teeAddress.should.eq(tee2);
     });
   });
 });

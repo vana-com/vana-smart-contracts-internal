@@ -2,11 +2,17 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/IAccessControl.sol";
-import {IFileRegistry} from "../../fileRegistry/interfaces/IFileRegistry.sol";
+import {IDataRegistry} from "../../dataRegistry/interfaces/IDataRegistry.sol";
 
-interface IDataLiquidityPoolLight is IAccessControl {
+interface IDataLiquidityPoolLight {
+    enum FileStatus {
+        None,
+        Added,
+        Validated,
+        Rejected
+    }
     struct File {
+        FileStatus status;
         uint256 registryId;
         uint256 timestamp;
         uint256 proofIndex;
@@ -21,7 +27,7 @@ interface IDataLiquidityPoolLight is IAccessControl {
 
     function name() external view returns (string memory);
     function version() external pure returns (uint256);
-    function fileRegistry() external view returns (IFileRegistry);
+    function dataRegistry() external view returns (IDataRegistry);
     function token() external view returns (IERC20);
     function masterKey() external view returns (string memory);
     function totalContributorsRewardAmount() external view returns (uint256);
@@ -31,6 +37,7 @@ interface IDataLiquidityPoolLight is IAccessControl {
     function filesCount() external view returns (uint256);
     struct FileResponse {
         uint256 fileId;
+        FileStatus status;
         uint256 registryId;
         uint256 timestamp;
         uint256 proofIndex;
@@ -51,8 +58,8 @@ interface IDataLiquidityPoolLight is IAccessControl {
     function pause() external;
     function unpause() external;
     function updateFileRewardFactor(uint256 newFileRewardFactor) external;
-    function updateFileRewardDelay(uint256 newFileRewardDelay) external;
     function addFile(uint256 registryId, uint256 proofIndex) external;
     function addRewardsForContributors(uint256 contributorsRewardAmount) external;
-    function claimContributionReward(uint256 fileId) external;
+    function validateFile(uint256 fileId) external;
+    function invalidateFile(uint256 fileId) external;
 }

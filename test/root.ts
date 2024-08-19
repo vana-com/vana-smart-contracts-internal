@@ -1,7 +1,7 @@
 import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
-import { ContractTransactionReceipt, Wallet } from "ethers";
+import { Wallet } from "ethers";
 import { DAT, DataLiquidityPoolsRootImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
@@ -44,10 +44,10 @@ describe("DataLiquidityPoolsRoot", () => {
   let startBlock: number;
   let epochRewardAmount = parseEther(2);
 
-  const ttfPercentage = 15;
-  const tfcPercentage = 15;
-  const vduPercentage = 50;
-  const uwPercentage = 20;
+  const ttfPercentage = parseEther(15);
+  const tfcPercentage = parseEther(15);
+  const vduPercentage = parseEther(50);
+  const uwPercentage = parseEther(20);
 
   const dlpInitialBalance = parseEther(0);
 
@@ -75,14 +75,18 @@ describe("DataLiquidityPoolsRoot", () => {
     const dlpRootDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("DataLiquidityPoolsRootImplementation"),
       [
-        [
-          owner.address,
-          maxNumberOfDlps,
-          minDlpStakeAmount,
-          startBlock,
-          epochSize,
-          epochRewardAmount,
-        ],
+        {
+          ownerAddress: owner.address,
+          maxNumberOfDlps: maxNumberOfDlps,
+          minDlpStakeAmount: minDlpStakeAmount,
+          startBlock: startBlock,
+          epochSize: epochSize,
+          epochRewardAmount: epochRewardAmount,
+          ttfPercentage: ttfPercentage,
+          tfcPercentage: tfcPercentage,
+          vduPercentage: vduPercentage,
+          uwPercentage: uwPercentage,
+        },
       ],
       {
         kind: "uups",
@@ -104,26 +108,26 @@ describe("DataLiquidityPoolsRoot", () => {
   async function register5Dlps() {
     await root
       .connect(dlp1Owner)
-      .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
     await root
       .connect(dlp2Owner)
-      .registerDlp(dlp2, dlp2Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp2, dlp2Owner, { value: parseEther(100) });
     await root
       .connect(dlp3Owner)
-      .registerDlp(dlp3, dlp3Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp3, dlp3Owner, { value: parseEther(100) });
     await root
       .connect(dlp4Owner)
-      .registerDlp(dlp4, dlp4Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp4, dlp4Owner, { value: parseEther(100) });
     await root
       .connect(dlp5Owner)
-      .registerDlp(dlp5, dlp5Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp5, dlp5Owner, { value: parseEther(100) });
   }
 
   async function registerNDlps(stakes: number[]) {
     for (let i = 0; i < stakes.length; i++) {
       await root
         .connect(dlp1Owner)
-        .registerDlp(Wallet.createRandom(), dlp1Owner, false, {
+        .registerDlp(Wallet.createRandom(), dlp1Owner, {
           value: parseEther(stakes[i].toString()),
         });
     }
@@ -132,7 +136,7 @@ describe("DataLiquidityPoolsRoot", () => {
   async function register1Dlp() {
     await root
       .connect(dlp1Owner)
-      .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+      .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
   }
 
   const generateStakes = (length: number, min: number, max: number) =>
@@ -164,6 +168,11 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.epochRewardAmount()).should.eq(epochRewardAmount);
       (await root.paused()).should.eq(false);
       (await root.version()).should.eq(1);
+
+      (await root.ttfPercentage()).should.eq(ttfPercentage);
+      (await root.tfcPercentage()).should.eq(tfcPercentage);
+      (await root.vduPercentage()).should.eq(vduPercentage);
+      (await root.uwPercentage()).should.eq(uwPercentage);
 
       (await root.epochsCount()).should.eq(0);
 
@@ -257,7 +266,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("Should updateEpochRewardAmount when owner", async function () {
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       (await root.epochs(1)).reward.should.eq(epochRewardAmount);
 
@@ -272,28 +281,13 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.epochs(1)).reward.should.eq(epochRewardAmount);
     });
 
-    it("Should updateEpochRewardAmount starting with the current epoch", async function () {
-      await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
-      await advanceToEpochN(3);
-      (await root.epochs(1)).reward.should.eq(epochRewardAmount);
+    it("Should reject updateEpochRewardAmount when not current epoch", async function () {
+      await advanceToEpochN(2);
 
       await root
         .connect(owner)
         .updateEpochRewardAmount(123)
-        .should.emit(root, "EpochRewardAmountUpdated")
-        .withArgs(123);
-
-      (await root.epochRewardAmount()).should.eq(123);
-
-      await advanceToEpochN(5);
-      await root.connect(dlp1).createEpochs();
-
-      (await root.epochs(1)).reward.should.eq(epochRewardAmount);
-      (await root.epochs(2)).reward.should.eq(epochRewardAmount);
-      (await root.epochs(3)).reward.should.eq(epochRewardAmount);
-      (await root.epochs(4)).reward.should.eq(123);
-      (await root.epochs(5)).reward.should.eq(123);
+        .should.be.rejectedWith("CurrentEpochNotCreated");
     });
 
     it("Should reject updateEpochSize when non-owner", async function () {
@@ -324,6 +318,59 @@ describe("DataLiquidityPoolsRoot", () => {
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${dlp1.address}")`,
         );
+
+      (await root.minDlpStakeAmount()).should.eq(minDlpStakeAmount);
+    });
+
+    it("Should updatePerformancePercentages when owner", async function () {
+      await root
+        .connect(owner)
+        .updatePerformancePercentages(
+          parseEther(10),
+          parseEther(20),
+          parseEther(30),
+          parseEther(40),
+        )
+        .should.emit(root, "PerformancePercentagesUpdated")
+        .withArgs(
+          parseEther(10),
+          parseEther(20),
+          parseEther(30),
+          parseEther(40),
+        );
+
+      (await root.ttfPercentage()).should.eq(parseEther(10));
+      (await root.tfcPercentage()).should.eq(parseEther(20));
+      (await root.vduPercentage()).should.eq(parseEther(30));
+      (await root.uwPercentage()).should.eq(parseEther(40));
+    });
+
+    it("Should reject updatePerformancePercentages when non-owner", async function () {
+      await root
+        .connect(dlp1)
+        .updatePerformancePercentages(
+          parseEther(10),
+          parseEther(20),
+          parseEther(30),
+          parseEther(40),
+        )
+        .should.be.rejectedWith(
+          `OwnableUnauthorizedAccount("${dlp1.address}")`,
+        );
+
+      (await root.minDlpStakeAmount()).should.eq(minDlpStakeAmount);
+    });
+
+    it("Should reject updatePerformancePercentages when invalid percentages", async function () {
+      await root
+        .connect(owner)
+        .updatePerformancePercentages(
+          parseEther(10),
+          parseEther(10),
+          parseEther(30),
+          parseEther(40),
+        )
+        .should.be.rejectedWith(`InvalidPerformancePercentages()`);
 
       (await root.minDlpStakeAmount()).should.eq(minDlpStakeAmount);
     });
@@ -462,11 +509,11 @@ describe("DataLiquidityPoolsRoot", () => {
       await deploy();
     });
 
-    it("should createEpochs after the end of the previous one", async function () {
+    it("should createNextEpoch after the end of the previous one", async function () {
       await advanceToEpochN(1);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
       await advanceToEpochN(2);
@@ -485,7 +532,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -498,127 +545,47 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2.dlpIds.should.deep.eq([]);
     });
 
-    it("should createEpochs after long time", async function () {
+    it("should createNextEpoch after long time", async function () {
+      (await root.epochsCount()).should.eq(0);
+
       await advanceToEpochN(4);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
-        .withArgs(2)
-        .emit(root, "EpochCreated")
-        .withArgs(3)
-        .emit(root, "EpochCreated")
-        .withArgs(4);
+        .withArgs(1);
 
-      (await root.epochsCount()).should.eq(4);
+      (await root.epochsCount()).should.eq(1);
+
+      const epoch1 = await root.epochs(1);
+      epoch1.startBlock.should.eq(startBlock);
+      epoch1.endBlock.should.eq(startBlock + epochSize - 1);
+      epoch1.reward.should.eq(epochRewardAmount);
+      epoch1.dlpIds.should.deep.eq([]);
 
       const epoch2 = await root.epochs(2);
-      epoch2.startBlock.should.eq(startBlock + epochSize);
-      epoch2.endBlock.should.eq(startBlock + 2 * epochSize - 1);
-      epoch2.reward.should.eq(epochRewardAmount);
+      epoch2.startBlock.should.eq(0);
+      epoch2.endBlock.should.eq(0);
+      epoch2.reward.should.eq(0);
       epoch2.dlpIds.should.deep.eq([]);
-
-      const epoch3 = await root.epochs(3);
-      epoch3.startBlock.should.eq(startBlock + 2 * epochSize);
-      epoch3.endBlock.should.eq(startBlock + 3 * epochSize - 1);
-      epoch3.reward.should.eq(epochRewardAmount);
-      epoch3.dlpIds.should.deep.eq([]);
-
-      const epoch4 = await root.epochs(4);
-      epoch4.startBlock.should.eq(startBlock + 3 * epochSize);
-      epoch4.endBlock.should.eq(startBlock + 4 * epochSize - 1);
-      epoch4.reward.should.eq(epochRewardAmount);
-      epoch4.dlpIds.should.deep.eq([]);
-    });
-
-    it("should createEpochsUntilBlockNumber after long time", async function () {
-      await advanceToEpochN(7);
-
-      const epoch4StartBlock = startBlock + 3 * epochSize;
-      await root
-        .connect(owner)
-        .createEpochsUntilBlockNumber(epoch4StartBlock)
-        .should.emit(root, "EpochCreated")
-        .withArgs(2)
-        .emit(root, "EpochCreated")
-        .withArgs(3)
-        .emit(root, "EpochCreated")
-        .withArgs(4);
-
-      (await root.epochsCount()).should.eq(4);
-
-      const epoch2 = await root.epochs(2);
-      epoch2.startBlock.should.eq(startBlock + epochSize);
-      epoch2.endBlock.should.eq(startBlock + 2 * epochSize - 1);
-      epoch2.reward.should.eq(epochRewardAmount);
-      epoch2.dlpIds.should.deep.eq([]);
-
-      const epoch3 = await root.epochs(3);
-      epoch3.startBlock.should.eq(startBlock + 2 * epochSize);
-      epoch3.endBlock.should.eq(startBlock + 3 * epochSize - 1);
-      epoch3.reward.should.eq(epochRewardAmount);
-      epoch3.dlpIds.should.deep.eq([]);
-
-      const epoch4 = await root.epochs(4);
-      epoch4.startBlock.should.eq(startBlock + 3 * epochSize);
-      epoch4.endBlock.should.eq(startBlock + 4 * epochSize - 1);
-      epoch4.reward.should.eq(epochRewardAmount);
-      epoch4.dlpIds.should.deep.eq([]);
-    });
-
-    it("should createEpochsUntilBlockNumber after long time #2", async function () {
-      await registerNDlps([101, 102, 103, 104, 101]);
-      await advanceToEpochN(7);
-
-      (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([4n, 3n, 2n]);
-      const epoch4StartBlock = startBlock + 3 * epochSize;
-      await root
-        .connect(owner)
-        .createEpochsUntilBlockNumber(epoch4StartBlock)
-        .should.emit(root, "EpochCreated")
-        .withArgs(2)
-        .emit(root, "EpochCreated")
-        .withArgs(3)
-        .emit(root, "EpochCreated")
-        .withArgs(4);
-
-      (await root.epochsCount()).should.eq(4);
-
-      const epoch2 = await root.epochs(2);
-      epoch2.startBlock.should.eq(startBlock + epochSize);
-      epoch2.endBlock.should.eq(startBlock + 2 * epochSize - 1);
-      epoch2.reward.should.eq(epochRewardAmount);
-      epoch2.dlpIds.should.deep.eq([4n, 3n, 2n]);
-
-      const epoch3 = await root.epochs(3);
-      epoch3.startBlock.should.eq(startBlock + 2 * epochSize);
-      epoch3.endBlock.should.eq(startBlock + 3 * epochSize - 1);
-      epoch3.reward.should.eq(epochRewardAmount);
-      epoch3.dlpIds.should.deep.eq([4n, 3n, 2n]);
-
-      const epoch4 = await root.epochs(4);
-      epoch4.startBlock.should.eq(startBlock + 3 * epochSize);
-      epoch4.endBlock.should.eq(startBlock + 4 * epochSize - 1);
-      epoch4.reward.should.eq(epochRewardAmount);
-      epoch4.dlpIds.should.deep.eq([4n, 3n, 2n]);
     });
 
     it("should create epochs with no active dlps", async function () {
       await advanceToEpochN(3);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       for (let i = 1; i <= 2; i++) {
         (await root.epochs(i)).dlpIds.should.deep.eq([]);
       }
     });
 
-    it("should createEpochs with one registered dlp", async function () {
+    it("should createNextEpoch with one registered dlp", async function () {
       await advanceToEpochN(1);
 
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
 
@@ -641,7 +608,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([1n]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -654,13 +621,13 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2.dlpIds.should.deep.eq([1]);
     });
 
-    it("should createEpochs with multiple registered dlps #1", async function () {
+    it("should createNextEpoch with multiple registered dlps #1", async function () {
       await advanceToEpochN(1);
 
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
 
@@ -683,7 +650,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([5n, 4n, 3n]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -696,13 +663,13 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2.dlpIds.should.deep.eq([5n, 4n, 3n]);
     });
 
-    it("should createEpochs with multiple registered dlps #2", async function () {
+    it("should createNextEpoch with multiple registered dlps #2", async function () {
       await advanceToEpochN(1);
 
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
 
@@ -725,7 +692,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([2n, 3n, 4n]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -738,12 +705,12 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2.dlpIds.should.deep.eq([2n, 3n, 4n]);
     });
 
-    it("should createEpochs with multiple registered dlps #3", async function () {
+    it("should createNextEpoch with multiple registered dlps #3", async function () {
       await advanceToEpochN(1);
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
 
@@ -766,7 +733,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.getTopDlpsIds(maxNumberOfDlps)).should.deep.eq([2n, 3n, 1n]);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -779,7 +746,7 @@ describe("DataLiquidityPoolsRoot", () => {
       epoch2.dlpIds.should.deep.eq([2n, 3n, 1n]);
     });
 
-    it("should createEpochs when 100 dlps and 16 maxNumberOfDlps", async function () {
+    it("should createNextEpoch when 100 dlps and 16 maxNumberOfDlps", async function () {
       await root.connect(owner).updateMaxNumberOfDlps(16);
       await root.connect(owner).updateMinDlpStakeAmount(1);
       const stakes = generateStakes(100, 1, 2);
@@ -791,33 +758,25 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.getTopDlpsIds(16)).should.deep.eq(topStakes);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
-        .withArgs(1)
-        .emit(root, "EpochCreated")
-        .withArgs(2);
+        .withArgs(1);
 
-      (await root.epochsCount()).should.eq(2);
+      (await root.epochsCount()).should.eq(1);
 
       const epoch1 = await root.epochs(1);
       epoch1.startBlock.should.eq(startBlock);
       epoch1.endBlock.should.eq(startBlock + epochSize - 1);
       epoch1.reward.should.eq(epochRewardAmount);
       epoch1.dlpIds.should.deep.eq(topStakes);
-
-      const epoch2 = await root.epochs(2);
-      epoch2.startBlock.should.eq(startBlock + epochSize);
-      epoch2.endBlock.should.eq(startBlock + 2 * epochSize - 1);
-      epoch2.reward.should.eq(epochRewardAmount);
-      epoch2.dlpIds.should.deep.eq(topStakes);
     });
 
-    xit("should createEpochs when 1000 dlps and 32 maxNumberOfDlps", async function () {
+    xit("should createNextEpoch when 1000 dlps and 32 maxNumberOfDlps", async function () {
       await root.connect(owner).updateEpochSize(2000);
       await advanceToEpochN(1);
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(1);
 
@@ -835,7 +794,7 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await root
         .connect(owner)
-        .createEpochs()
+        .createNextEpoch()
         .should.emit(root, "EpochCreated")
         .withArgs(2);
 
@@ -860,7 +819,7 @@ describe("DataLiquidityPoolsRoot", () => {
       await deploy();
 
       await advanceToEpochN(1);
-      await root.createEpochs();
+      await root.createNextEpoch();
     });
 
     it("should stake and emit event", async function () {
@@ -906,7 +865,7 @@ describe("DataLiquidityPoolsRoot", () => {
       await root
         .connect(user1)
         .stake(1, { value: parseEther(10) })
-        .should.be.rejectedWith("CurrentEpochNotInitialized");
+        .should.be.rejectedWith("CurrentEpochNotCreated");
     });
 
     it("should stake multiple times, same epoch", async function () {
@@ -933,7 +892,7 @@ describe("DataLiquidityPoolsRoot", () => {
       await root.connect(user1).stake(1, { value: parseEther(10) });
 
       await advanceToEpochN(2);
-      await root.createEpochs();
+      await root.createNextEpoch();
 
       await root.connect(user1).stake(1, { value: parseEther(20) });
 
@@ -1052,7 +1011,7 @@ describe("DataLiquidityPoolsRoot", () => {
       await deploy();
 
       await advanceToEpochN(1);
-      await root.createEpochs();
+      await root.createNextEpoch();
     });
 
     it("should registerDlp", async function () {
@@ -1060,7 +1019,7 @@ describe("DataLiquidityPoolsRoot", () => {
         await ethers.provider.getBalance(dlp1Owner);
       const tx = await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
       const receipt = await getReceipt(tx);
 
       await tx.should
@@ -1100,7 +1059,7 @@ describe("DataLiquidityPoolsRoot", () => {
       const user1InitialBalance = await ethers.provider.getBalance(user1);
       const tx = await root
         .connect(user1)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
       const receipt = await getReceipt(tx);
 
       await tx.should
@@ -1136,11 +1095,11 @@ describe("DataLiquidityPoolsRoot", () => {
       );
     });
 
-    it("should registerDlp as with grant", async function () {
+    it("should registerDlpWithGrant", async function () {
       const ownerInitialBalance = await ethers.provider.getBalance(owner);
       const tx = await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
       const receipt = await getReceipt(tx);
 
       await tx.should
@@ -1186,17 +1145,17 @@ describe("DataLiquidityPoolsRoot", () => {
 
       const tx1 = await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       const receipt1 = await getReceipt(tx1);
 
       const tx2 = await root
         .connect(dlp2Owner)
-        .registerDlp(dlp2, dlp2Owner, false, { value: parseEther(200) });
+        .registerDlp(dlp2, dlp2Owner, { value: parseEther(200) });
       const receipt2 = await getReceipt(tx2);
       const tx3 = await root
         .connect(dlp3Owner)
-        .registerDlp(dlp3, dlp3Owner, false, { value: parseEther(300) });
+        .registerDlp(dlp3, dlp3Owner, { value: parseEther(300) });
       const receipt3 = await getReceipt(tx3);
 
       return;
@@ -1279,42 +1238,42 @@ describe("DataLiquidityPoolsRoot", () => {
       await root.connect(owner).pause();
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(1) })
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(1) })
         .should.be.rejectedWith(`EnforcedPause()`);
     });
 
     it("Should reject registerDlp when stake amount too small", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(1) })
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(1) })
         .should.be.rejectedWith(`InvalidStakeAmount()`);
     });
 
     it("Should reject registerDlp when already registered", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) })
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) })
         .should.be.rejectedWith(`InvalidDlpStatus()`);
     });
 
     it("Should reject registerDlp when deregistered", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
       await root.connect(dlp1Owner).deregisterDlp(1);
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) })
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) })
         .should.be.rejectedWith(`InvalidDlpStatus()`);
     });
 
     it("should deregisterDlp when dlp owner", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1349,10 +1308,10 @@ describe("DataLiquidityPoolsRoot", () => {
       (await ethers.provider.getBalance(root)).should.eq(dlpInitialBalance);
     });
 
-    it("should deregisterDlp when granted", async function () {
+    it("should deregisterDlp when granted as admin", async function () {
       await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1387,7 +1346,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("Should reject deregisterDlp when non dlp owner", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       await root
         .connect(owner)
@@ -1408,7 +1367,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("Should reject deregisterDlp when deregistered", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       await root.connect(dlp1Owner).deregisterDlp(1);
 
@@ -1510,7 +1469,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should deregisterDlpByOwner when dlp owner", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1556,7 +1515,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should deregisterDlpByOwner when granted #full unstake amount", async function () {
       await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
 
@@ -1605,7 +1564,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should deregisterDlpByOwner when granted #partial unstake amount", async function () {
       await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1654,7 +1613,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should deregisterDlpByOwner when granted #no unstake amount #2", async function () {
       await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1701,7 +1660,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should deregisterDlpByOwner when granted and deregistered", async function () {
       await root
         .connect(owner)
-        .registerDlp(dlp1, dlp1Owner, true, { value: parseEther(100) });
+        .registerDlpWithGrant(dlp1, dlp1Owner, { value: parseEther(100) });
 
       (await root.stakers(dlp1Owner)).should.eq(parseEther(100));
       (await root.stakerDlps(dlp1Owner, 1)).should.eq(parseEther(100));
@@ -1755,7 +1714,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("Should reject deregisterDlpByOwner when non dlp owner", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       await root
         .connect(dlp1Owner)
@@ -1782,7 +1741,7 @@ describe("DataLiquidityPoolsRoot", () => {
     it("Should reject deregisterDlpByOwner when stakeAmount = 0", async function () {
       await root
         .connect(dlp1Owner)
-        .registerDlp(dlp1, dlp1Owner, false, { value: parseEther(100) });
+        .registerDlp(dlp1, dlp1Owner, { value: parseEther(100) });
 
       await root.connect(dlp1Owner).deregisterDlp(1);
 
@@ -1891,13 +1850,17 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await advanceToEpochN(1);
 
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [{ dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 }])
+        .saveEpochPerformances(
+          1,
+          [{ dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 }],
+          true,
+        )
         .should.emit(root, "EpochPerformancesSaved")
-        .withArgs(1);
+        .withArgs(1, true);
 
       const epoch1Dlp1 = await root.epochDlps(1, 1);
       epoch1Dlp1.ttf.should.eq(2);
@@ -1910,16 +1873,20 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should saveEpochDlpPerformance multiple dlps #1", async function () {
       await registerNDlps([100, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
-          { dlpId: 2, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
+            { dlpId: 2, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
+          ],
+          true,
+        )
         .should.emit(root, "EpochPerformancesSaved")
-        .withArgs(1);
+        .withArgs(1, true);
 
       const epoch1Dlp1 = await root.epochDlps(1, 1);
       epoch1Dlp1.ttf.should.eq(2);
@@ -1939,36 +1906,37 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should saveEpochDlpPerformance multiple dlps #2", async function () {
       await registerNDlps([100, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
-          { dlpId: 2, ttf: 6, tfc: 9, vdu: 12, uw: 15 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 4, uw: 5 },
+            { dlpId: 2, ttf: 6, tfc: 9, vdu: 12, uw: 15 },
+          ],
+          true,
+        )
         .should.emit(root, "EpochPerformancesSaved")
-        .withArgs(1);
+        .withArgs(1, true);
 
-      const totalScore = BigInt(
-        (2 + 6) * ttfPercentage +
-          (3 + 9) * tfcPercentage +
-          (4 + 12) * vduPercentage +
-          (5 + 15) * uwPercentage,
-      );
+      const totalScore =
+        (2n + 6n) * ttfPercentage +
+        (3n + 9n) * tfcPercentage +
+        (4n + 12n) * vduPercentage +
+        (5n + 15n) * uwPercentage;
 
-      const epoch1Dlp1Score = BigInt(
-        2 * ttfPercentage +
-          3 * tfcPercentage +
-          4 * vduPercentage +
-          5 * uwPercentage,
-      );
-      const epoch1Dlp2Score = BigInt(
-        6 * ttfPercentage +
-          9 * tfcPercentage +
-          12 * vduPercentage +
-          15 * uwPercentage,
-      );
+      const epoch1Dlp1Score =
+        2n * ttfPercentage +
+        3n * tfcPercentage +
+        4n * vduPercentage +
+        5n * uwPercentage;
+      const epoch1Dlp2Score =
+        6n * ttfPercentage +
+        9n * tfcPercentage +
+        12n * vduPercentage +
+        15n * uwPercentage;
 
       const epoch1Dlp1 = await root.epochDlps(1, 1);
       epoch1Dlp1.ttf.should.eq(2);
@@ -1994,43 +1962,43 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should saveEpochDlpPerformance multiple dlps #3", async function () {
       await registerNDlps([100, 200, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.emit(root, "EpochPerformancesSaved")
-        .withArgs(1);
+        .withArgs(1, true);
 
-      const totalScore = BigInt(
-        (2 + 11 + 23) * ttfPercentage +
-          (3 + 13 + 29) * tfcPercentage +
-          (5 + 17 + 31) * vduPercentage +
-          (7 + 19 + 37) * uwPercentage,
-      );
+      const totalScore =
+        (2n + 11n + 23n) * ttfPercentage +
+        (3n + 13n + 29n) * tfcPercentage +
+        (5n + 17n + 31n) * vduPercentage +
+        (7n + 19n + 37n) * uwPercentage;
 
-      const epoch1Dlp1Score = BigInt(
-        2 * ttfPercentage +
-          3 * tfcPercentage +
-          5 * vduPercentage +
-          7 * uwPercentage,
-      );
-      const epoch1Dlp2Score = BigInt(
-        11 * ttfPercentage +
-          13 * tfcPercentage +
-          17 * vduPercentage +
-          19 * uwPercentage,
-      );
-      const epoch1Dlp3Score = BigInt(
-        23 * ttfPercentage +
-          29 * tfcPercentage +
-          31 * vduPercentage +
-          37 * uwPercentage,
-      );
+      const epoch1Dlp1Score =
+        2n * ttfPercentage +
+        3n * tfcPercentage +
+        5n * vduPercentage +
+        7n * uwPercentage;
+      const epoch1Dlp2Score =
+        11n * ttfPercentage +
+        13n * tfcPercentage +
+        17n * vduPercentage +
+        19n * uwPercentage;
+      const epoch1Dlp3Score =
+        23n * ttfPercentage +
+        29n * tfcPercentage +
+        31n * vduPercentage +
+        37n * uwPercentage;
 
       const epoch1Dlp1 = await root.epochDlps(1, 1);
       epoch1Dlp1.ttf.should.eq(2);
@@ -2063,90 +2031,118 @@ describe("DataLiquidityPoolsRoot", () => {
     it("should reject saveEpochDlpPerformance when non owner", async function () {
       await registerNDlps([100, 200, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(dlp1Owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${dlp1Owner.address}")`,
         );
 
       await root
         .connect(dlp1)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${dlp1.address}")`,
         );
 
       await root
         .connect(user1)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${user1.address}")`,
         );
     });
 
-    it("should reject saveEpochDlpPerformance when already saved", async function () {
+    it("should reject saveEpochDlpPerformance when epoch is finished", async function () {
       await registerNDlps([100, 200, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
-      await root.connect(owner).saveEpochPerformances(1, [
-        { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-        { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-        { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-      ]);
-
-      await root
-        .connect(owner)
-        .saveEpochPerformances(1, [
+      await root.connect(owner).saveEpochPerformances(
+        1,
+        [
           { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
           { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
           { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
-        .should.be.rejectedWith(`EpochPerformancesAlreadySet`);
+        ],
+        true,
+      );
+
+      await root
+        .connect(owner)
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
+        .should.be.rejectedWith(`InvalidEpochStatus()`);
     });
 
     it("should reject saveEpochDlpPerformance when dlp not in epoch #1", async function () {
       await registerNDlps([100, 200, 200]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 4, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 4, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.be.rejectedWith(`InvalidPerformances`);
     });
 
     it("should reject saveEpochDlpPerformance when dlp not in epoch #2", async function () {
       await registerNDlps([100, 200, 200, 300]);
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
       await root
         .connect(owner)
-        .saveEpochPerformances(1, [
-          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-        ])
+        .saveEpochPerformances(
+          1,
+          [
+            { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+            { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+            { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+          ],
+          true,
+        )
         .should.be.rejectedWith(`InvalidPerformances`);
     });
   });
@@ -2158,48 +2154,54 @@ describe("DataLiquidityPoolsRoot", () => {
 
     it("should claimReward when only dlpOwners has staked", async function () {
       await registerNDlps([100, 200, 200]);
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(1, parseEther(100));
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(2, parseEther(100));
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(3, parseEther(100));
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
-      await root.connect(owner).saveEpochPerformances(1, [
-        { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-        { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-        { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-      ]);
-
-      const totalScore = BigInt(
-        (2 + 11 + 23) * ttfPercentage +
-          (3 + 13 + 29) * tfcPercentage +
-          (5 + 17 + 31) * vduPercentage +
-          (7 + 19 + 37) * uwPercentage,
+      await root.connect(owner).saveEpochPerformances(
+        1,
+        [
+          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+        ],
+        true,
       );
+
+      const totalScore =
+        (2n + 11n + 23n) * ttfPercentage +
+        (3n + 13n + 29n) * tfcPercentage +
+        (5n + 17n + 31n) * vduPercentage +
+        (7n + 19n + 37n) * uwPercentage;
 
       const epoch1Dlp1Reward =
         (epochRewardAmount *
-          BigInt(
-            2 * ttfPercentage +
-              3 * tfcPercentage +
-              5 * vduPercentage +
-              7 * uwPercentage,
-          )) /
+          (2n * ttfPercentage +
+            3n * tfcPercentage +
+            5n * vduPercentage +
+            7n * uwPercentage)) /
         totalScore;
       const epoch1Dlp2Reward =
         (epochRewardAmount *
-          BigInt(
-            11 * ttfPercentage +
-              13 * tfcPercentage +
-              17 * vduPercentage +
-              19 * uwPercentage,
-          )) /
+          (11n * ttfPercentage +
+            13n * tfcPercentage +
+            17n * vduPercentage +
+            19n * uwPercentage)) /
         totalScore;
       const epoch1Dlp3Reward =
         (epochRewardAmount *
-          BigInt(
-            23 * ttfPercentage +
-              29 * tfcPercentage +
-              31 * vduPercentage +
-              37 * uwPercentage,
-          )) /
+          (23n * ttfPercentage +
+            29n * tfcPercentage +
+            31n * vduPercentage +
+            37n * uwPercentage)) /
         totalScore;
 
       await root
@@ -2220,51 +2222,57 @@ describe("DataLiquidityPoolsRoot", () => {
     });
     it("should claimReward when staker", async function () {
       await registerNDlps([100, 200, 200]);
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(1, parseEther(100));
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(2, parseEther(100));
+      await root
+        .connect(dlp1Owner)
+        .updateDlpStakersPercentage(3, parseEther(100));
 
       await root.connect(user1).stake(1, { value: parseEther(300) });
 
       await advanceToEpochN(1);
-      await root.connect(owner).createEpochs();
+      await root.connect(owner).createNextEpoch();
 
-      await root.connect(owner).saveEpochPerformances(1, [
-        { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
-        { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
-        { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
-      ]);
-
-      const totalScore = BigInt(
-        (2 + 11 + 23) * ttfPercentage +
-          (3 + 13 + 29) * tfcPercentage +
-          (5 + 17 + 31) * vduPercentage +
-          (7 + 19 + 37) * uwPercentage,
+      await root.connect(owner).saveEpochPerformances(
+        1,
+        [
+          { dlpId: 1, ttf: 2, tfc: 3, vdu: 5, uw: 7 },
+          { dlpId: 2, ttf: 11, tfc: 13, vdu: 17, uw: 19 },
+          { dlpId: 3, ttf: 23, tfc: 29, vdu: 31, uw: 37 },
+        ],
+        true,
       );
+
+      const totalScore =
+        (2n + 11n + 23n) * ttfPercentage +
+        (3n + 13n + 29n) * tfcPercentage +
+        (5n + 17n + 31n) * vduPercentage +
+        (7n + 19n + 37n) * uwPercentage;
 
       const epoch1Dlp1Reward =
         (epochRewardAmount *
-          BigInt(
-            2 * ttfPercentage +
-              3 * tfcPercentage +
-              5 * vduPercentage +
-              7 * uwPercentage,
-          )) /
+          (2n * ttfPercentage +
+            3n * tfcPercentage +
+            5n * vduPercentage +
+            7n * uwPercentage)) /
         totalScore;
       const epoch1Dlp2Reward =
         (epochRewardAmount *
-          BigInt(
-            11 * ttfPercentage +
-              13 * tfcPercentage +
-              17 * vduPercentage +
-              19 * uwPercentage,
-          )) /
+          (11n * ttfPercentage +
+            13n * tfcPercentage +
+            17n * vduPercentage +
+            19n * uwPercentage)) /
         totalScore;
       const epoch1Dlp3Reward =
         (epochRewardAmount *
-          BigInt(
-            23 * ttfPercentage +
-              29 * tfcPercentage +
-              31 * vduPercentage +
-              37 * uwPercentage,
-          )) /
+          (23n * ttfPercentage +
+            29n * tfcPercentage +
+            31n * vduPercentage +
+            37n * uwPercentage)) /
         totalScore;
 
       await root

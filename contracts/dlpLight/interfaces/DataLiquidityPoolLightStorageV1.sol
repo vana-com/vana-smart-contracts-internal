@@ -14,15 +14,15 @@ abstract contract DataLiquidityPoolLightStorageV1 is IDataLiquidityPoolLight {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     string public override name;
-    IFileRegistry public override fileRegistry;
+    IDataRegistry public override dataRegistry;
     IERC20 public override token;
     string public override masterKey;
     uint256 public override totalContributorsRewardAmount;
     uint256 public override fileRewardFactor;
     uint256 public override fileRewardDelay;
 
+    uint256 public override filesCount;
     mapping(uint256 => File) internal _files;
-    EnumerableSet.Bytes32Set internal _fileUrlHashes;
 
     uint256 public override contributorsCount;
     mapping(uint256 => address) internal _contributors;

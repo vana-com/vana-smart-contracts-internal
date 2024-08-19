@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/IAccessControl.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-interface IDataLiquidityPoolsRoot is IAccessControl {
+interface IDataLiquidityPoolsRoot {
     enum DlpStatus {
         None,
         Registered,
         Deregistered
+    }
+
+    enum EpochStatus {
+        None,
+        Created,
+        Finished
     }
 
     struct Epoch {
@@ -17,6 +22,7 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         uint256 reward;
         EnumerableSet.UintSet dlpIds;
         mapping(uint256 => EpochDlp) dlps;
+        EpochStatus status;
     }
 
     struct Dlp {
@@ -27,6 +33,7 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         DlpStatus status;
         uint256 registrationBlockNumber;
         uint256 grantedAmount;
+        uint256 stakersPercentage;
     }
 
     struct EpochDlp {
@@ -34,6 +41,7 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
         uint256 tfc;
         uint256 vdu;
         uint256 uw;
+        uint256 stakersPercentage;
         uint256 stakedAmount;
         uint256 rewardAmount;
     }
@@ -77,6 +85,10 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
     function minDlpStakeAmount() external view returns (uint256);
     function totalDlpsRewardAmount() external view returns (uint256);
     function epochRewardAmount() external view returns (uint256);
+    function ttfPercentage() external view returns (uint256);
+    function tfcPercentage() external view returns (uint256);
+    function vduPercentage() external view returns (uint256);
+    function uwPercentage() external view returns (uint256);
     function dlpsCount() external view returns (uint256);
     struct DlpResponse {
         uint256 id;
@@ -104,15 +116,22 @@ interface IDataLiquidityPoolsRoot is IAccessControl {
     function updateEpochSize(uint256 newEpochSize) external;
     function updateEpochRewardAmount(uint256 newEpochRewardAmount) external;
     function updateMinDlpStakeAmount(uint256 newMinStakeAmount) external;
-    function createEpochs() external;
-    function createEpochsUntilBlockNumber(uint256 blockNumber) external;
-    function registerDlp(address dlpAddress, address payable ownerAddress, bool granted) external payable;
+    function updatePerformancePercentages(
+        uint256 newTtfPercentage,
+        uint256 newTfcPercentage,
+        uint256 newVduPercentage,
+        uint256 newUwPercentage
+    ) external;
+    function createNextEpoch() external;
+    function registerDlp(address dlpAddress, address payable ownerAddress) external payable;
+    function registerDlpWithGrant(address dlpAddress, address payable ownerAddress) external payable;
+    function updateDlpStakersPercentage(uint256 dlpId, uint256 stakersPercentage) external;
     function deregisterDlp(uint256 dlpId) external;
     function deregisterDlpByOwner(uint256 dlpId, uint256 unstakeAmount) external;
     function addRewardForDlps() external payable;
     function claimReward(uint256 epochNumber, uint256 dlpId) external;
     function stake(uint256 dlpId) external payable;
     function unstake(uint256 dlpId, uint256 amount) external;
-    function saveEpochPerformances(uint256 epochId, DlpPerformance[] memory dlpPerformances) external;
+    function saveEpochPerformances(uint256 epochId, DlpPerformance[] memory dlpPerformances, bool isFinal) external;
     function withdraw(address _token, address _to, uint256 _amount) external returns (bool success);
 }
