@@ -10,5 +10,5 @@ import "./IDataRegistry.sol";
  */
 abstract contract DataRegistryStorageV1 is IDataRegistry {
     uint256 public override filesCount;
-    mapping(uint256 => File) internal _files;
+    mapping(uint256 fileId => File) internal _files;
 }

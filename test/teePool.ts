@@ -8,6 +8,13 @@ import {
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { getReceipt, parseEther } from "../utils/helpers";
 import { deployDataRegistry, proofs } from "./dataRegistry";
+import {
+  advanceBlockNTimes,
+  advanceNSeconds,
+  advanceToBlockN,
+  getCurrentBlockNumber,
+  getCurrentBlockTimestamp,
+} from "../utils/timeAndBlockManipulation";
 
 chai.use(chaiAsPromised);
 should();
@@ -24,6 +31,7 @@ describe("TeePool", () => {
 
   let teePool: TeePoolImplementation;
   let dataRegistry: DataRegistryImplementation;
+  let cancelDelay: number = 100;
 
   enum TeeStatus {
     None = 0,
@@ -32,7 +40,9 @@ describe("TeePool", () => {
   }
   enum JobStatus {
     None = 0,
-    Completed = 1,
+    Submitted = 1,
+    Completed = 2,
+    Canceled = 3,
   }
 
   const deploy = async () => {
@@ -43,7 +53,7 @@ describe("TeePool", () => {
 
     const teePoolDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("TeePoolImplementation"),
-      [owner.address, dataRegistry.target],
+      [owner.address, dataRegistry.target, cancelDelay],
       {
         kind: "uups",
       },
@@ -142,6 +152,21 @@ describe("TeePool", () => {
       await teePool
         .connect(user1)
         .updateTeeFee(parseEther(0.2))
+        .should.be.rejectedWith(
+          `OwnableUnauthorizedAccount("${user1.address}")`,
+        );
+    });
+
+    it("Should updateCancelDelay when owner", async function () {
+      await teePool.connect(owner).updateCancelDelay(200).should.be.fulfilled;
+
+      (await teePool.cancelDelay()).should.eq(200);
+    });
+
+    it("Should reject updateCancelDelay when non-owner", async function () {
+      await teePool
+        .connect(user1)
+        .updateCancelDelay(200)
         .should.be.rejectedWith(
           `OwnableUnauthorizedAccount("${user1.address}")`,
         );
@@ -424,9 +449,40 @@ describe("TeePool", () => {
       const job1 = await teePool.jobs(1);
       job1.bidAmount.should.eq(parseEther(0.01));
       job1.fileId.should.eq(1);
+      job1.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job1.ownerAddress.should.eq(user1.address);
+      job1.status.should.eq(JobStatus.Submitted);
 
       (await ethers.provider.getBalance(user1.address)).should.eq(
-        user1InitialBalance - parseEther(0.01) - BigInt(receipt.fee),
+        user1InitialBalance - parseEther(0.01) - receipt.fee,
+      );
+    });
+
+    it("should submitJob", async function () {
+      const user1InitialBalance = await ethers.provider.getBalance(
+        user1.address,
+      );
+
+      const tx = await teePool
+        .connect(user1)
+        .submitJob(1, { value: parseEther(0.01) });
+      const receipt = await getReceipt(tx);
+
+      await tx.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(1, 1, parseEther(0.01));
+
+      (await teePool.jobsCount()).should.eq(1);
+
+      const job1 = await teePool.jobs(1);
+      job1.bidAmount.should.eq(parseEther(0.01));
+      job1.fileId.should.eq(1);
+      job1.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job1.ownerAddress.should.eq(user1.address);
+      job1.status.should.eq(JobStatus.Submitted);
+
+      (await ethers.provider.getBalance(user1.address)).should.eq(
+        user1InitialBalance - parseEther(0.01) - receipt.fee,
       );
     });
 
@@ -448,10 +504,16 @@ describe("TeePool", () => {
       const job1 = await teePool.jobs(1);
       job1.bidAmount.should.eq(parseEther(0.01));
       job1.fileId.should.eq(1);
+      job1.addedTimestamp.should.eq((await getCurrentBlockTimestamp()) - 1);
+      job1.ownerAddress.should.eq(user1.address);
+      job1.status.should.eq(JobStatus.Submitted);
 
       const job2 = await teePool.jobs(2);
       job2.bidAmount.should.eq(parseEther(0.02));
       job2.fileId.should.eq(123);
+      job2.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job2.ownerAddress.should.eq(user1.address);
+      job2.status.should.eq(JobStatus.Submitted);
 
       (await ethers.provider.getBalance(user1.address)).should.eq(
         user1InitialBalance -
@@ -541,6 +603,118 @@ describe("TeePool", () => {
         .connect(user1)
         .requestContributionProof(1, { value: parseEther(0.001) })
         .should.be.rejectedWith("InsufficientFee()");
+    });
+
+    it("should cancelJob without bid when teeFee != 0", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1));
+
+      const user1InitialBalance = await ethers.provider.getBalance(user1);
+
+      const tx1 = await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.1) });
+
+      await tx1.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(1, 1, parseEther(0.1));
+
+      (await teePool.jobsCount()).should.eq(1);
+
+      const job1Before = await teePool.jobs(1);
+      job1Before.bidAmount.should.eq(parseEther(0.1));
+      job1Before.fileId.should.eq(1);
+      job1Before.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job1Before.ownerAddress.should.eq(user1.address);
+      job1Before.status.should.eq(JobStatus.Submitted);
+
+      await advanceNSeconds(cancelDelay);
+      await advanceBlockNTimes(1);
+      const tx2 = await teePool.connect(user1).cancelJob(1);
+
+      await tx2.should.emit(teePool, "JobCanceled").withArgs(1);
+
+      (await ethers.provider.getBalance(user1.address)).should.eq(
+        user1InitialBalance -
+          (await getReceipt(tx1)).fee -
+          (await getReceipt(tx2)).fee,
+      );
+
+      const job1After = await teePool.jobs(1);
+      job1After.bidAmount.should.eq(parseEther(0.1));
+      job1After.fileId.should.eq(1);
+      job1After.ownerAddress.should.eq(user1.address);
+      job1After.status.should.eq(JobStatus.Canceled);
+    });
+
+    it("should cancelJob without bid when teeFee = 0", async function () {
+      const user1InitialBalance = await ethers.provider.getBalance(user1);
+
+      (await teePool.teeFee()).should.eq(0);
+
+      const tx1 = await teePool.connect(user1).requestContributionProof(1);
+
+      await tx1.should.emit(teePool, "JobSubmitted").withArgs(1, 1, 0);
+
+      (await teePool.jobsCount()).should.eq(1);
+
+      const job1Before = await teePool.jobs(1);
+      job1Before.bidAmount.should.eq(0);
+      job1Before.fileId.should.eq(1);
+      job1Before.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job1Before.ownerAddress.should.eq(user1.address);
+      job1Before.status.should.eq(JobStatus.Submitted);
+
+      await advanceNSeconds(cancelDelay);
+      await advanceBlockNTimes(1);
+
+      const tx2 = await teePool.connect(user1).cancelJob(1);
+
+      await tx2.should.emit(teePool, "JobCanceled").withArgs(1);
+
+      (await ethers.provider.getBalance(user1.address)).should.eq(
+        user1InitialBalance -
+          (await getReceipt(tx1)).fee -
+          (await getReceipt(tx2)).fee,
+      );
+
+      const job1After = await teePool.jobs(1);
+      job1After.bidAmount.should.eq(0);
+      job1After.fileId.should.eq(1);
+      job1After.ownerAddress.should.eq(user1.address);
+      job1After.status.should.eq(JobStatus.Canceled);
+    });
+
+    it("should reject cancelJob before cancelDelay", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1));
+
+      await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.1) });
+
+      (await teePool.jobsCount()).should.eq(1);
+
+      await teePool
+        .connect(user1)
+        .cancelJob(1)
+        .should.be.rejectedWith("CancelDelayNotPassed()");
+    });
+
+    it("should reject cancelJob when not job owner", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1));
+
+      await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.1) });
+
+      (await teePool.jobsCount()).should.eq(1);
+
+      await advanceNSeconds(cancelDelay);
+      await advanceBlockNTimes(1);
+
+      await teePool
+        .connect(user2)
+        .cancelJob(1)
+        .should.be.rejectedWith("NotJobOwner()");
     });
   });
 
@@ -697,7 +871,7 @@ describe("TeePool", () => {
         tee1InfoAfter.withdrawnAmount.should.eq(parseEther(0.01));
 
         (await ethers.provider.getBalance(tee1)).should.eq(
-          tee1InitialBalance + parseEther(0.01) - BigInt(receipt.fee),
+          tee1InitialBalance + parseEther(0.01) - receipt.fee,
         );
         (await ethers.provider.getBalance(teePool)).should.eq(
           teePoolInitialBalance - parseEther(0.01),
@@ -798,7 +972,7 @@ describe("TeePool", () => {
     });
   });
 
-  describe("jobTee", () => {
+  describe("JobTee", () => {
     beforeEach(async () => {
       await deploy();
     });

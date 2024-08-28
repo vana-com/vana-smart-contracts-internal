@@ -4,10 +4,10 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { deployProxy, verifyProxy } from "./helpers";
 import { parseEther } from "../utils/helpers";
 
-const implementationContractName = "DataLiquidityPoolLightImplementation";
-const proxyContractName = "DataLiquidityPoolLightProxy";
+const implementationContractName = "DataLiquidityPoolImplementation";
+const proxyContractName = "DataLiquidityPoolProxy";
 const proxyContractPath =
-  "contracts/dlpLight/DataLiquidityPoolLightProxy.sol:DataLiquidityPoolLightProxy";
+  "contracts/dlpLight/DataLiquidityPoolProxy.sol:DataLiquidityPoolProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const [deployer] = await ethers.getSigners();

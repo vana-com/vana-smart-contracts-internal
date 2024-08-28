@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 
 interface IDataLiquidityPoolsRoot {
     enum DlpStatus {
@@ -10,63 +11,45 @@ interface IDataLiquidityPoolsRoot {
         Deregistered
     }
 
-    enum EpochStatus {
-        None,
-        Created,
-        Finished
+    struct EpochDlp {
+        uint256 ttf; //Total Transactions Facilitated by the DLP
+        uint256 tfc; //Total Transaction Fees (Gas Costs) Created by the DLP
+        uint256 vdu; //Total Number of Verified Data Uploads to the DLP
+        uint256 uw; //Unique Wallets that Interacted with the DLP
+        uint256 stakeAmount;
+        uint256 rewardAmount;
+        uint256 stakersPercentage;
     }
 
     struct Epoch {
         uint256 startBlock;
         uint256 endBlock;
-        uint256 reward;
+        uint256 rewardAmount;
         EnumerableSet.UintSet dlpIds;
-        mapping(uint256 => EpochDlp) dlps;
-        EpochStatus status;
+        bool isFinalised;
+        mapping(uint256 dlpId => EpochDlp epochDlp) dlps;
+    }
+
+    struct DlpStaker {
+        uint256 lastClaimedEpochId;
+        Checkpoints.Trace208 stakeAmountCheckpoints;
+        mapping(uint256 epochId => uint256 claimAmount) claimAmounts;
     }
 
     struct Dlp {
         uint256 id;
         address dlpAddress;
         address payable ownerAddress;
-        uint256 stakeAmount;
         DlpStatus status;
         uint256 registrationBlockNumber;
+        uint256 stakersPercentage;
         uint256 grantedAmount;
-        uint256 stakersPercentage;
-    }
-
-    struct EpochDlp {
-        uint256 ttf;
-        uint256 tfc;
-        uint256 vdu;
-        uint256 uw;
-        uint256 stakersPercentage;
-        uint256 stakedAmount;
-        uint256 rewardAmount;
-    }
-
-    struct StakerDlpEpoch {
-        uint256 stakedAmount;
-        uint256 withdrawnReward;
-    }
-
-    struct StakerDlp {
-        uint256 stakedAmount;
-        mapping(uint256 => StakerDlpEpoch) epochs;
+        Checkpoints.Trace208 stakeAmountCheckpoints;
+        mapping(address staker => DlpStaker dlpStaker) stakers;
     }
 
     struct Staker {
-        uint256 totalStaked;
-        mapping(uint256 => StakerDlp) dlps;
-    }
-
-    struct DlpPerformance {
-        uint256 dlpId;
-        uint256 ttf;
-        uint256 tfc;
-        uint256 vdu;
-        uint256 uw;
+        EnumerableSet.UintSet dlpIds;
     }
 
     function version() external pure returns (uint256);
@@ -74,14 +57,14 @@ interface IDataLiquidityPoolsRoot {
     function epochSize() external view returns (uint256);
     function registeredDlps() external view returns (uint256[] memory);
     function epochsCount() external view returns (uint256);
-    struct EpochResponse {
+    struct EpochInfo {
         uint256 startBlock;
         uint256 endBlock;
         uint256 reward;
+        bool isFinalised;
         uint256[] dlpIds;
     }
-    function epochs(uint256 epochId) external view returns (EpochResponse memory);
-    function epochDlps(uint256 epochId, uint256 dlpId) external view returns (EpochDlp memory);
+    function epochs(uint256 epochId) external view returns (EpochInfo memory);
     function minDlpStakeAmount() external view returns (uint256);
     function totalDlpsRewardAmount() external view returns (uint256);
     function epochRewardAmount() external view returns (uint256);
@@ -94,22 +77,48 @@ interface IDataLiquidityPoolsRoot {
         uint256 id;
         address dlpAddress;
         address ownerAddress;
-        uint256 stakeAmount;
         DlpStatus status;
         uint256 registrationBlockNumber;
         uint256 grantedAmount;
+        uint256 stakersPercentage;
+        uint256 stakeAmount;
     }
     function dlps(uint256 index) external view returns (DlpResponse memory);
     function dlpsByAddress(address dlpAddress) external view returns (DlpResponse memory);
     function dlpIds(address dlpAddress) external view returns (uint256);
-    function stakers(address staker) external view returns (uint256);
-    function stakerDlps(address staker, uint256 dlpId) external view returns (uint256);
+    struct DlpEpochInfo {
+        uint256 ttf; //Total Transactions Facilitated by the DLP
+        uint256 tfc; //Total Transaction Fees (Gas Costs) Created by the DLP
+        uint256 vdu; //Total Number of Verified Data Uploads to the DLP
+        uint256 uw; //Unique Wallets that Interacted with the DLP
+        uint256 stakeAmount;
+        bool isTopDlp; //is in the top dlps list
+        uint256 rewardAmount; // = 0 if isTopDlp is false or epoch is not finished
+        uint256 stakersPercentage; // = 0 if isTopDlp is false
+    }
+    function dlpEpochs(uint256 dlpId, uint256 epochId) external view returns (DlpEpochInfo memory);
+    struct StakerDlpInfo {
+        uint256 dlpId;
+        uint256 stakeAmount;
+        uint256 lastClaimedEpochId;
+    }
+    function stakerDlpsListCount(address stakerAddress) external view returns (uint256);
+    function stakerDlpsList(address stakerAddress) external view returns (StakerDlpInfo[] memory);
+    function stakerDlps(address stakerAddress, uint256 dlpId) external view returns (StakerDlpInfo memory);
+    struct StakerDlpEpochInfo {
+        uint256 dlpId;
+        uint256 epochId;
+        uint256 stakeAmount; //stake amount at the start of the epoch
+        uint256 rewardAmount; //reward amount at the end of the epoch
+        uint256 claimAmount; //amount claimed by the staker
+    }
     function stakerDlpEpochs(
-        address staker,
+        address stakerAddress,
         uint256 dlpId,
         uint256 epochId
-    ) external view returns (StakerDlpEpoch memory);
-    function getTopDlpsIds(uint256 numberOfDlps) external returns (uint256[] memory);
+    ) external view returns (StakerDlpEpochInfo memory);
+    function topDlpIds(uint256 numberOfDlps) external returns (uint256[] memory);
+    function claimableAmount(address stakerAddress, uint256 dlpId) external returns (uint256);
     function pause() external;
     function unpause() external;
     function updateMaxNumberOfDlps(uint256 newMaxNumberOfDlps) external;
@@ -122,16 +131,28 @@ interface IDataLiquidityPoolsRoot {
         uint256 newVduPercentage,
         uint256 newUwPercentage
     ) external;
-    function createNextEpoch() external;
-    function registerDlp(address dlpAddress, address payable ownerAddress) external payable;
-    function registerDlpWithGrant(address dlpAddress, address payable ownerAddress) external payable;
+    function createEpochs() external;
+    function createEpochsUntilBlockNumber(uint256 blockNumber) external;
+    function registerDlp(address dlpAddress, address payable ownerAddress, uint256 stakersPercentage) external payable;
+    function registerDlpWithGrant(
+        address dlpAddress,
+        address payable ownerAddress,
+        uint256 stakersPercentage
+    ) external payable;
     function updateDlpStakersPercentage(uint256 dlpId, uint256 stakersPercentage) external;
     function deregisterDlp(uint256 dlpId) external;
-    function deregisterDlpByOwner(uint256 dlpId, uint256 unstakeAmount) external;
+    function distributeStakeAfterDeregistration(uint256 dlpId, uint256 dlpOwnerAmount) external;
     function addRewardForDlps() external payable;
-    function claimReward(uint256 epochNumber, uint256 dlpId) external;
+    function claimRewardUntilEpoch(uint256 dlpId, uint256 lastEpochToClaim) external;
+    function claimReward(uint256 dlpId) external;
     function stake(uint256 dlpId) external payable;
     function unstake(uint256 dlpId, uint256 amount) external;
-    function saveEpochPerformances(uint256 epochId, DlpPerformance[] memory dlpPerformances, bool isFinal) external;
-    function withdraw(address _token, address _to, uint256 _amount) external returns (bool success);
+    struct DlpPerformance {
+        uint256 dlpId;
+        uint256 ttf; //Total Transactions Facilitated by the DLP
+        uint256 tfc; //Total Transaction Fees (Gas Costs) Created by the DLP
+        uint256 vdu; //Total Number of Verified Data Uploads to the DLP
+        uint256 uw; //Unique Wallets that Interacted with the DLP
+    }
+    function saveEpochPerformances(uint256 epochId, DlpPerformance[] memory dlpPerformances, bool isFinalised) external;
 }

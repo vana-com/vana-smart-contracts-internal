@@ -7,8 +7,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/TeePoolStorageV1.sol";
 
-import "hardhat/console.sol";
-
 contract TeePoolImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
@@ -26,10 +24,43 @@ contract TeePoolImplementation is
      * @param bidAmount                         bid amount
      */
     event JobSubmitted(uint256 indexed jobId, uint256 indexed fileId, uint256 bidAmount);
-    event ProofAdded(address indexed atestator, uint256 indexed jobId, uint256 indexed fileId);
 
+    /**
+     * @notice Triggered when a job has been cancelled
+     *
+     * @param jobId                             id of the job
+     */
+    event JobCanceled(uint256 indexed jobId);
+
+    /**
+     * @notice Triggered when a proof has been added
+     *
+     * @param attestator                         address of the attestator
+     * @param jobId                             id of the job
+     * @param fileId                            id of the file
+     */
+    event ProofAdded(address indexed attestator, uint256 indexed jobId, uint256 indexed fileId);
+
+    /**
+     * @notice Triggered when a tee has been added
+     *
+     * @param teeAddress                        address of the tee
+     */
     event TeeAdded(address indexed teeAddress);
+
+    /**
+     * @notice Triggered when a tee has been removed
+     *
+     * @param teeAddress                        address of the tee
+     */
     event TeeRemoved(address indexed teeAddress);
+
+    /**
+     * @notice Triggered when a claim has been made
+     *
+     * @param teeAddress                        address of the tee
+     * @param amount                            amount claimed
+     */
     event Claimed(address indexed teeAddress, uint256 amount);
 
     error TeeAlreadyAdded();
@@ -38,6 +69,8 @@ contract TeePoolImplementation is
     error NothingToClaim();
     error InsufficientFee();
     error NoActiveTee();
+    error NotJobOwner();
+    error CancelDelayNotPassed();
 
     modifier onlyActiveTee() {
         if (!(_tees[msg.sender].status == TeeStatus.Active)) {
@@ -50,14 +83,21 @@ contract TeePoolImplementation is
      * @notice Initialize the contract
      *
      * @param ownerAddress                      address of the owner
+     * @param dataRegistryAddress               address of the data registry contract
+     * @param initialCancelDelay                initial cancel delay
      */
-    function initialize(address ownerAddress, address dataRegistryAddress) external initializer {
+    function initialize(
+        address ownerAddress,
+        address dataRegistryAddress,
+        uint256 initialCancelDelay
+    ) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
 
         dataRegistry = IDataRegistry(dataRegistryAddress);
+        cancelDelay = initialCancelDelay;
 
         _transferOwnership(ownerAddress);
     }
@@ -93,9 +133,9 @@ contract TeePoolImplementation is
      * @param teeAddress                        address of the tee
      * @return TeeDetails                       details of the tee
      */
-    function tees(address teeAddress) public view override returns (TeeDetails memory) {
+    function tees(address teeAddress) public view override returns (TeeInfo memory) {
         return
-            TeeDetails({
+            TeeInfo({
                 teeAddress: teeAddress,
                 url: _tees[teeAddress].url,
                 status: _tees[teeAddress].status,
@@ -124,7 +164,7 @@ contract TeePoolImplementation is
      * @param index                             index of the tee
      * @return TeeDetails                       details of the tee
      */
-    function teeListAt(uint256 index) external view override returns (TeeDetails memory) {
+    function teeListAt(uint256 index) external view override returns (TeeInfo memory) {
         return tees(_teeList.at(index));
     }
 
@@ -148,8 +188,12 @@ contract TeePoolImplementation is
      * @param index                             index of the tee
      * @return TeeDetails                       details of the tee
      */
-    function activeTeeListAt(uint256 index) external view override returns (TeeDetails memory) {
+    function activeTeeListAt(uint256 index) external view override returns (TeeInfo memory) {
         return tees(_activeTeeList.at(index));
+    }
+
+    function isTee(address teeAddress) external view override returns (bool) {
+        return _tees[teeAddress].status == TeeStatus.Active;
     }
 
     /**
@@ -158,7 +202,7 @@ contract TeePoolImplementation is
      * @param jobId                             id of the job
      * @return TeeDetails                       details of the tee
      */
-    function jobTee(uint256 jobId) external view override returns (TeeDetails memory) {
+    function jobTee(uint256 jobId) external view override returns (TeeInfo memory) {
         if (_activeTeeList.length() == 0) {
             revert NoActiveTee();
         }
@@ -198,6 +242,15 @@ contract TeePoolImplementation is
     }
 
     /**
+     * @notice Updates the cancel delay
+     *
+     * @param newCancelDelay                    new cancel delay
+     */
+    function updateCancelDelay(uint256 newCancelDelay) external override onlyOwner {
+        cancelDelay = newCancelDelay;
+    }
+
+    /**
      * @notice Adds a tee to the pool
      *
      * @param teeAddress                        address of the tee
@@ -232,11 +285,11 @@ contract TeePoolImplementation is
     }
 
     /**
-     * @notice Request a contribution proof
+     * @notice Adds a contribution proof request
      *
      * @param fileId                            id of the file
      */
-    function requestContributionProof(uint256 fileId) external payable override {
+    function requestContributionProof(uint256 fileId) public payable override {
         if (msg.value < teeFee) {
             revert InsufficientFee();
         }
@@ -244,8 +297,41 @@ contract TeePoolImplementation is
         jobsCount++;
         _jobs[jobsCount].fileId = fileId;
         _jobs[jobsCount].bidAmount = msg.value;
+        _jobs[jobsCount].addedTimestamp = block.timestamp;
+        _jobs[jobsCount].ownerAddress = msg.sender;
+        _jobs[jobsCount].status = JobStatus.Submitted;
 
         emit JobSubmitted(jobsCount, fileId, msg.value);
+    }
+
+    /**
+     * @notice Submits a contribution proof request
+     *
+     * @param fileId                            id of the file
+     */
+    function submitJob(uint256 fileId) external payable override {
+        requestContributionProof(fileId);
+    }
+
+    /**
+     * @notice Adds a contribution proof request
+     *
+     * @param jobId                            id of the job
+     */
+    function cancelJob(uint256 jobId) external override {
+        if (_jobs[jobId].ownerAddress != msg.sender) {
+            revert NotJobOwner();
+        }
+
+        if (_jobs[jobId].addedTimestamp + cancelDelay > block.timestamp) {
+            revert CancelDelayNotPassed();
+        }
+
+        payable(msg.sender).transfer(_jobs[jobId].bidAmount);
+
+        _jobs[jobsCount].status = JobStatus.Canceled;
+
+        emit JobCanceled(jobId);
     }
 
     /**
@@ -257,7 +343,7 @@ contract TeePoolImplementation is
     function addProof(uint256 jobId, IDataRegistry.Proof memory proof) external payable override onlyActiveTee {
         Job storage job = _jobs[jobId];
 
-        if (job.status != JobStatus.None) {
+        if (job.status != JobStatus.Submitted) {
             revert JobCompleted();
         }
 

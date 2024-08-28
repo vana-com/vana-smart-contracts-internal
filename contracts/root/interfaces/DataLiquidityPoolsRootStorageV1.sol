@@ -21,13 +21,13 @@ abstract contract DataLiquidityPoolsRootStorageV1 is IDataLiquidityPoolsRoot {
     uint256 public override uwPercentage;
 
     uint256 public override dlpsCount;
-    mapping(uint256 => Dlp) internal _dlps;
-    mapping(address => uint256) public override dlpIds;
+    mapping(uint256 dlpId => Dlp dlp) internal _dlps;
+    mapping(address dlpAddress => uint256 dlpId) public override dlpIds;
 
     EnumerableSet.UintSet internal _registeredDlps;
 
     uint256 public override epochsCount;
-    mapping(uint256 => Epoch) internal _epochs;
+    mapping(uint256 epochId => Epoch epoch) internal _epochs;
 
-    mapping(address => Staker) internal _stakers;
+    mapping(address stakerAddress => Staker staker) internal _stakers;
 }

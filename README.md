@@ -68,7 +68,7 @@ If you get an error, it may be because the block explorer has already verified m
 
    These steps ensure that rewards can be claimed immediately and that there are sufficient tokens allocated for rewards.
 
-12. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlp-upgrade.ts` script:
+12. If you need to upgrade the `DataLiquidityPool` contract in the future, you can use the `dlpOld-upgrade.ts` script:
 
 ```bash
 npx hardhat deploy --network satori --tags DLPUpgrade

@@ -13,11 +13,12 @@ abstract contract TeePoolStorageV1 is ITeePool {
     IDataRegistry public override dataRegistry;
 
     uint256 public override jobsCount;
-    mapping(uint256 => Job) internal _jobs;
+    mapping(uint256 jobId => Job job) internal _jobs;
 
     EnumerableSet.AddressSet internal _teeList;
     EnumerableSet.AddressSet internal _activeTeeList;
-    mapping(address => Tee) internal _tees;
+    mapping(address teeAddress => Tee tee) internal _tees;
 
     uint256 public override teeFee;
+    uint256 public override cancelDelay;
 }

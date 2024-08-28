@@ -16,20 +16,28 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
   const maxNumberOfDlps = 10;
-  const rewardPeriodSize = 1800;
-  const minStakeAmount = parseEther("0.0001");
+  const epochSize = 1800;
+  const minDlpStakeAmount = parseEther("0.0001");
   const startBlock: number = await getCurrentBlockNumber();
-  const rewardAmount = parseEther("0.001");
+  const epochRewardAmount = parseEther("0.001");
   const addRewardToDlpAmount = parseEther("0.1");
+  const ttfPercentage = parseEther("0.15");
+  const tfcPercentage = parseEther("0.15");
+  const vduPercentage = parseEther("0.50");
+  const uwPercentage = parseEther("0.20");
 
   const initializeParams = [
     [
       deployer.address,
       maxNumberOfDlps,
-      minStakeAmount,
+      minDlpStakeAmount,
       startBlock,
-      rewardPeriodSize,
-      rewardAmount,
+      epochSize,
+      epochRewardAmount,
+      ttfPercentage,
+      tfcPercentage,
+      vduPercentage,
+      uwPercentage,
     ],
   ];
 

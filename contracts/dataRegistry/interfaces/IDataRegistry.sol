@@ -20,8 +20,8 @@ interface IDataRegistry {
         string url;
         uint256 addedAtBlock;
         uint256 proofsCount;
-        mapping(uint256 => Proof) proofs;
-        mapping(address => string) permissions;
+        mapping(uint256 proofId => Proof proof) proofs;
+        mapping(address account => string key) permissions;
     }
 
     struct FileResponse {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import {DataLiquidityPoolLightImplementation} from "../../dlpLight/DataLiquidityPoolLightImplementation.sol";
+import {DataLiquidityPoolOldImplementation} from "../../dlpOld/DataLiquidityPoolOldImplementation.sol";
 
-contract DataLiquidityPoolLightImplementationV2Mock is DataLiquidityPoolLightImplementation {
+contract DataLiquidityPoolOldImplementationV2Mock is DataLiquidityPoolOldImplementation {
     /**
      * @notice Upgrade the contract
      * This function is required by OpenZeppelin's UUPSUpgradeable
