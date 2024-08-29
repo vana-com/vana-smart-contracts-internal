@@ -15,37 +15,36 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-  const maxNumberOfDlps = 10;
-  const epochSize = 1800;
-  const minDlpStakeAmount = parseEther("0.0001");
+  const maxNumberOfDlps = 16;
+  const epochSize = 14400;
+  const minDlpStakeAmount = parseEther("0.1");
   const startBlock: number = await getCurrentBlockNumber();
-  const epochRewardAmount = parseEther("0.001");
-  const addRewardToDlpAmount = parseEther("0.1");
-  const ttfPercentage = parseEther("0.15");
-  const tfcPercentage = parseEther("0.15");
-  const vduPercentage = parseEther("0.50");
-  const uwPercentage = parseEther("0.20");
+  const epochRewardAmount = parseEther("1");
+  const ttfPercentage = parseEther("15");
+  const tfcPercentage = parseEther("15");
+  const vduPercentage = parseEther("50");
+  const uwPercentage = parseEther("20");
 
-  const initializeParams = [
-    [
-      deployer.address,
-      maxNumberOfDlps,
-      minDlpStakeAmount,
-      startBlock,
-      epochSize,
-      epochRewardAmount,
-      ttfPercentage,
-      tfcPercentage,
-      vduPercentage,
-      uwPercentage,
-    ],
-  ];
+  const addRewardToDlpAmount = parseEther("1000");
+
+  const initializeParams = {
+    ownerAddress: deployer.address,
+    maxNumberOfDlps: maxNumberOfDlps,
+    minDlpStakeAmount: minDlpStakeAmount,
+    startBlock: startBlock,
+    epochSize: epochSize,
+    epochRewardAmount: epochRewardAmount,
+    ttfPercentage: ttfPercentage,
+    tfcPercentage: tfcPercentage,
+    vduPercentage: vduPercentage,
+    uwPercentage: uwPercentage,
+  };
 
   const proxyDeploy = await deployProxy(
     deployer,
     proxyContractName,
     implementationContractName,
-    initializeParams,
+    [initializeParams],
   );
 
   console.log(``);

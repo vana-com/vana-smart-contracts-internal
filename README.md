@@ -11,3 +11,13 @@ yarn install
 ```bash
 npx hardhat test
 ```
+
+
+
+
+### Satori deployments:
+DataLiquidityPoolsRoot: ```0x8f514f140034a1C23Cbc31f8D7aCDE78C41AF9E8```
+
+DataRegistry: ```0xDAAD102189FE8D0FE43c1926b109E94D06bD8a97```
+
+TeePool: ```0x88790ffF10E952ffc13Be22a442616eAfE081594```

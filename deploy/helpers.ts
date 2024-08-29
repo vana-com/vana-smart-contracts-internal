@@ -110,11 +110,14 @@ export async function deployProxy(
     implementationContractName,
   );
 
-  const implementation = await deployments.deploy(implementationContractName, {
-    from: deployer.address,
-    args: [],
-    log: true,
-  });
+  const implementationDeploy = await deployments.deploy(
+    implementationContractName,
+    {
+      from: deployer.address,
+      args: [],
+      log: true,
+    },
+  );
 
   // Encode the initializer function call
   const initializeData = implementationFactory.interface.encodeFunctionData(
@@ -122,9 +125,9 @@ export async function deployProxy(
     initializeParams,
   );
 
-  const rootProxy = await deployments.deploy(proxyContractName, {
+  const proxyDeploy = await deployments.deploy(proxyContractName, {
     from: deployer.address,
-    args: [implementation.address, initializeData],
+    args: [implementationDeploy.address, initializeData],
     log: true,
   });
 
@@ -135,13 +138,13 @@ export async function deployProxy(
   console.log(`**************************************************************`);
   console.log(`**************************************************************`);
   console.log(`********** Save contract to .openzeppelin file **********`);
-  await upgrades.forceImport(rootProxy.address, implementationFactory, {
+  await upgrades.forceImport(proxyDeploy.address, implementationFactory, {
     kind: "uups",
   });
 
   return {
-    proxyAddress: rootProxy.address,
-    implementationAddress: implementation.address,
+    proxyAddress: proxyDeploy.address,
+    implementationAddress: implementationDeploy.address,
     initializeData,
   };
 }

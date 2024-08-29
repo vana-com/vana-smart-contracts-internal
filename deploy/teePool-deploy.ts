@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { deployments, ethers } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { deployProxy, verifyProxy } from "./helpers";
@@ -12,10 +12,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-  const initializeParams = [
-    ownerAddress,
-    "0xDAAD102189FE8D0FE43c1926b109E94D06bD8a97",
-  ];
+  const fileRegistry = await ethers.getContractAt(
+    "FileRegistryImplementation",
+    (await deployments.get("FileRegistryProxy")).address,
+  );
+
+  const initializeParams = [ownerAddress, fileRegistry.target];
 
   const proxyDeploy = await deployProxy(
     deployer,

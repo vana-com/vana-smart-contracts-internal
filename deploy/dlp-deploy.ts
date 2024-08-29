@@ -37,42 +37,36 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "DataRegistryImplementation",
     (await deployments.get("DataRegistryProxy")).address,
   );
+  const teePool = await ethers.getContractAt(
+    "TeePoolImplementation",
+    (await deployments.get("TeePoolProxy")).address,
+  );
 
   const params = {
     ownerAddress: ownerAddress,
     name: "DLP Name",
     dataRegistryAddress: dataRegistry.target,
+    teePoolAddress: teePool.target,
     tokenAddress: token.target,
     masterKey: "masterKey",
     fileRewardFactor: parseEther(10),
   };
 
-  const initializeParams = [
-    params.ownerAddress,
-    params.name,
-    params.dataRegistryAddress,
-    params.tokenAddress,
-    params.masterKey,
-    params.fileRewardFactor,
-  ];
-
   const proxyDeploy = await deployProxy(
     deployer,
     proxyContractName,
     implementationContractName,
-    [initializeParams],
+    [params],
   );
 
-  const dlpLight = await ethers.getContractAt(
+  const dlp = await ethers.getContractAt(
     implementationContractName,
     proxyDeploy.proxyAddress,
   );
 
   await token.connect(deployer).mint(deployer, parseEther(100000000));
-  await token.connect(deployer).approve(dlpLight, parseEther(1000000));
-  await dlpLight
-    .connect(deployer)
-    .addRewardsForContributors(parseEther(1000000));
+  await token.connect(deployer).approve(dlp, parseEther(1000000));
+  await dlp.connect(deployer).addRewardsForContributors(parseEther(1000000));
 
   await verifyProxy(
     proxyDeploy.proxyAddress,
@@ -85,4 +79,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["DLPLightDeploy"];
+func.tags = ["DLPDeploy"];
