@@ -168,6 +168,7 @@ contract DataLiquidityPoolsRootImplementation is
     error PreviousEpochNotFinalised();
     error EpochNotEnded();
     error EpochEnded();
+    error EpochFinalised();
     error InvalidStakersPercentage();
 
     /**
@@ -704,6 +705,10 @@ contract DataLiquidityPoolsRootImplementation is
 
         if (epoch.startBlock == 0) {
             revert EpochNotStarted();
+        }
+
+        if (epoch.isFinalised) {
+            revert EpochFinalised();
         }
 
         if (isFinalised) {
