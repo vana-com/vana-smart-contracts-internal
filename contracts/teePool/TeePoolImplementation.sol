@@ -66,6 +66,7 @@ contract TeePoolImplementation is
     error TeeAlreadyAdded();
     error TeeNotActive();
     error JobCompleted();
+    error InvalidJobStatus();
     error NothingToClaim();
     error InsufficientFee();
     error NoActiveTee();
@@ -318,18 +319,22 @@ contract TeePoolImplementation is
      *
      * @param jobId                            id of the job
      */
-    function cancelJob(uint256 jobId) external override {
+    function cancelJob(uint256 jobId) external override nonReentrant {
         if (_jobs[jobId].ownerAddress != msg.sender) {
             revert NotJobOwner();
+        }
+
+        if (_jobs[jobId].status != JobStatus.Submitted) {
+            revert InvalidJobStatus();
         }
 
         if (_jobs[jobId].addedTimestamp + cancelDelay > block.timestamp) {
             revert CancelDelayNotPassed();
         }
 
-        payable(msg.sender).transfer(_jobs[jobId].bidAmount);
-
         _jobs[jobsCount].status = JobStatus.Canceled;
+
+        payable(msg.sender).transfer(_jobs[jobId].bidAmount);
 
         emit JobCanceled(jobId);
     }

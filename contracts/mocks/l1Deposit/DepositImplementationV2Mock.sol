@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
-import "../../vanaL1Deposit/DepositImplementation.sol";
+import "../../l1Deposit/DepositImplementation.sol";
 
 contract DepositImplementationV2Mock is DepositImplementation {
     /**

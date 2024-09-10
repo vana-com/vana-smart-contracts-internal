@@ -28,6 +28,11 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
 
     mapping(bytes pubkey => Validator validator) public validators;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @notice Used to initialize the deposit contract
      *
@@ -46,7 +51,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         for (uint height = 0; height < DEPOSIT_CONTRACT_TREE_DEPTH - 1; height++)
             zero_hashes[height + 1] = sha256(abi.encodePacked(zero_hashes[height], zero_hashes[height]));
 
-        restricted = true;
+        restricted = false;
         minDepositAmount = _minDepositAmount;
         maxDepositAmount = _maxDepositAmount;
 
@@ -129,8 +134,9 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         if (restricted) {
             require(validators[pubkey].isAllowed, "DepositContract: publicKey not allowed");
             require(!validators[pubkey].hasDeposit, "DepositContract: publickey already used");
-            validators[pubkey].hasDeposit = true;
         }
+
+        validators[pubkey].hasDeposit = true;
 
         // Extended ABI length checks since dynamic types are used.
         require(pubkey.length == 48, "DepositContract: invalid pubkey length");
@@ -191,16 +197,6 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         // As the loop should always end prematurely with the `return` statement,
         // this code should be unreachable. We assert `false` just to be safe.
         assert(false);
-    }
-
-    function toHexString(bytes32 data) public pure returns (string memory) {
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(64);
-        for (uint i = 0; i < 32; i++) {
-            str[i * 2] = alphabet[uint(uint8(data[i] >> 4))];
-            str[1 + i * 2] = alphabet[uint(uint8(data[i] & 0x0f))];
-        }
-        return string(str);
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {

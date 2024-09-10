@@ -28,6 +28,20 @@ module.exports = {
           ? [process.env.DEPLOYER_PRIVATE_KEY]
           : [],
     },
+    ediPos2: {
+      url: "http://34.72.57.139:8545/",
+      accounts:
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
+    ediPos3: {
+      url: "http://34.30.131.204:8545/",
+      accounts:
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
   },
   etherscan: {
     apiKey: {
