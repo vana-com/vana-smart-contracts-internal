@@ -1,29 +1,83 @@
 import { ethers } from "hardhat";
+import { parseEther } from "../utils/helpers";
 
 async function main() {
   // Get the signer (wallet) from Hardhat, connected to the specified network
   const [signer] = await ethers.getSigners();
 
-  // const depositAddress = "0x4242424242424242424242424242424242424242";
-  const depositAddress = "0x68b4d6525ca86518dff604553b31be7b5b2c8ab4";
-  // const depositAddress2 = "0xF1925473bA6aa147EeB2529197C2704454D66b43"; //custom proxy
-  // const depositAddress2 = "0xf9215f0f774b6dBcd0209e24Df3aE182E9813fd7"; //custom impl
+  const depositAddress = "0x4242424242424242424242424242424242424242";
+  const depositImplementationAddress =
+    "0x1111111111111111111111111111111111111111";
 
   const depositContract = await ethers.getContractAt(
     "DepositImplementation",
     depositAddress,
   );
 
-  console.log(await ethers.provider.getBalance(depositAddress));
-  console.log(await ethers.provider.getBlockNumber());
+  const depositProxy = await ethers.getContractAt(
+    "DepositProxy",
+    depositAddress,
+  );
 
-  console.log(await depositContract.get_deposit_count());
+  if ((await ethers.provider.getBlockNumber()) == 0) {
+    throw new Error("Network is not active yet");
+  }
 
-  // console.log("**********************");
-  // console.log(await ethers.provider.getCode(depositAddress));
-  // console.log("**********************");
-  // console.log(await ethers.provider.getCode(depositAddress2));
-  // console.log("**********************");
+  console.log(
+    `Deposit contract initial balance: ${(await ethers.provider.getBalance(depositAddress)) / parseEther(1)} VANA`,
+  );
+
+  // ****************** contract initialization start ******************
+  console.log(
+    "Set implementation transaction: ",
+    await depositProxy.setImplementation(depositImplementationAddress, "0x"),
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 20000));
+  console.log(
+    "Initialize transaction: ",
+    await depositContract.initialize(
+      signer.address,
+      parseEther(35000),
+      parseEther(35000),
+      [],
+    ),
+  );
+
+  // ****************** contract initialization end ******************
+
+  await new Promise((resolve) => setTimeout(resolve, 20000));
+
+  console.log(
+    "Deposit root before: ",
+    await depositContract.get_deposit_root(),
+  );
+  console.log(
+    "Deposit count before: ",
+    await depositContract.get_deposit_count(),
+  );
+
+  console.log(
+    await depositContract.deposit(
+      "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "0x0100000000000000000000000000000000000000000000000000000000000001",
+      "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "0xddc3f739e834cac39f2f81fa81c446ce6335c4baec5b00feb85d6c3ecde5a76e",
+      { value: parseEther(35000) },
+    ),
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 20000));
+
+  console.log("Deposit root after: ", await depositContract.get_deposit_root());
+  console.log(
+    "Deposit count after: ",
+    await depositContract.get_deposit_count(),
+  );
+
+  console.log(
+    `Deposit contract final balance: ${(await ethers.provider.getBalance(depositAddress)) / parseEther(1)} VANA`,
+  );
 }
 
 main().catch((error) => {

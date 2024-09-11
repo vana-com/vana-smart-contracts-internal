@@ -51,7 +51,6 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         for (uint height = 0; height < DEPOSIT_CONTRACT_TREE_DEPTH - 1; height++)
             zero_hashes[height + 1] = sha256(abi.encodePacked(zero_hashes[height], zero_hashes[height]));
 
-        restricted = false;
         minDepositAmount = _minDepositAmount;
         maxDepositAmount = _maxDepositAmount;
 
@@ -122,6 +121,31 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
 
     function get_deposit_count() external view override returns (bytes memory) {
         return to_little_endian_64(uint64(deposit_count));
+    }
+
+    function depositGet(
+        bytes calldata pubkey,
+        bytes calldata withdrawal_credentials,
+        bytes calldata signature,
+        bytes32 deposit_data_root,
+        uint256 amount
+    ) external view returns (bytes32) {
+        // Compute deposit data root (`DepositData` hash tree root)
+        bytes32 pubkey_root = sha256(abi.encodePacked(pubkey, bytes16(0)));
+        bytes32 signature_root = sha256(
+            abi.encodePacked(
+                sha256(abi.encodePacked(signature[:64])),
+                sha256(abi.encodePacked(signature[64:], bytes32(0)))
+            )
+        );
+
+        return
+            sha256(
+                abi.encodePacked(
+                    sha256(abi.encodePacked(pubkey_root, withdrawal_credentials)),
+                    sha256(abi.encodePacked(to_little_endian_64(uint64(amount / 1 gwei)), bytes24(0), signature_root))
+                )
+            );
     }
 
     function deposit(
@@ -203,7 +227,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         return interfaceId == type(ERC165).interfaceId || interfaceId == type(IDeposit).interfaceId;
     }
 
-    function to_little_endian_64(uint64 value) internal pure returns (bytes memory ret) {
+    function to_little_endian_64(uint64 value) public pure returns (bytes memory ret) {
         ret = new bytes(8);
         bytes8 bytesValue = bytes8(value);
         // Byteswapping during copying to bytes.
