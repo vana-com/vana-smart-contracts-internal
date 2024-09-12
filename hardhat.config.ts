@@ -20,7 +20,11 @@ module.exports = {
     },
   },
   networks: {
-    hardhat: {},
+    hardhat: {
+      // forking: {
+      //   url: `http://34.30.131.204:8545/`,
+      // },
+    },
     satori: {
       url: process.env.SATORI_RPC_URL || "",
       accounts:

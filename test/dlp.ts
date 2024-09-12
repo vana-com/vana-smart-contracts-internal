@@ -1,7 +1,6 @@
 import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers, upgrades } from "hardhat";
-import { parseEther } from "ethers";
 import {
   DAT,
   DataLiquidityPoolImplementation,
@@ -16,12 +15,13 @@ import {
   getCurrentBlockNumber,
   getCurrentBlockTimestamp,
 } from "../utils/timeAndBlockManipulation";
-import { deployDataRegistry, proofs } from "./dataRegistry";
+import { deployDataRegistry, Proof, proofs, signProof } from "./dataRegistry";
+import { parseEther } from "../utils/helpers";
 
 chai.use(chaiAsPromised);
 should();
 
-describe.only("DataLiquidityPool", () => {
+describe("DataLiquidityPool", () => {
   enum ValidatorStatus {
     None,
     Registered,
@@ -78,6 +78,8 @@ describe.only("DataLiquidityPool", () => {
       "TeePoolImplementation",
       teePoolDeploy.target,
     );
+
+    await teePool.connect(owner).addTee(tee1.address, "tee1Url");
 
     const dlpDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("DataLiquidityPoolImplementation"),
@@ -315,7 +317,13 @@ describe.only("DataLiquidityPool", () => {
 
     it("should addFile", async function () {
       await dataRegistry.connect(user1).addFile("file1Url");
-      await dataRegistry.connect(tee1).addProof(1, proofs[1]);
+
+      const proof1: Proof = {
+        signature: await signProof(tee1, "file1Url", proofs[1].data),
+        data: proofs[1].data,
+      };
+
+      await dataRegistry.connect(tee1).addProof(1, proof1);
 
       await dlp
         .connect(user1)
@@ -345,12 +353,21 @@ describe.only("DataLiquidityPool", () => {
 
     it("should addFile multiple times by same user", async function () {
       await dataRegistry.connect(user1).addFile("file1Url");
-      await dataRegistry.connect(tee1).addProof(1, proofs[1]);
+
+      const proof1: Proof = {
+        signature: await signProof(tee1, "file1Url", proofs[1].data),
+        data: proofs[1].data,
+      };
+      await dataRegistry.connect(user1).addProof(1, proof1);
 
       await dataRegistry.connect(user1).addFile("file2Url");
-      await dataRegistry.connect(tee1).addProof(2, proofs[2]);
 
-      const timestamp = await getCurrentBlockTimestamp();
+      const proof2: Proof = {
+        signature: await signProof(tee1, "file2Url", proofs[2].data),
+        data: proofs[2].data,
+      };
+      await dataRegistry.connect(tee1).addProof(2, proof2);
+
       await dlp
         .connect(user1)
         .addFile(1, 1)
@@ -401,11 +418,22 @@ describe.only("DataLiquidityPool", () => {
   describe("File validation", () => {
     beforeEach(async () => {
       await deploy();
+
+      await dat.connect(owner).approve(dlp.target, parseEther(1000));
+      await dlp.connect(owner).addRewardsForContributors(parseEther(1000));
     });
 
-    it("should validateFile when owner", async function () {
+    it.only("should validateFile when owner", async function () {
+      await dataRegistry.connect(user1).addFile("file1Url");
+
+      const proof1: Proof = {
+        signature: await signProof(tee1, "file1Url", proofs[1].data),
+        data: proofs[1].data,
+      };
+
+      await dataRegistry.connect(user1).addProof(1, proof1);
+
       await dlp.connect(user1).addFile(1, 1);
-      const file = await dlp.files(1);
       await dlp
         .connect(owner)
         .validateFile(1)

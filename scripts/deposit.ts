@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { parseEther } from "../utils/helpers";
+import { getReceipt, parseEther } from "../utils/helpers";
 
 async function main() {
   // Get the signer (wallet) from Hardhat, connected to the specified network
@@ -8,6 +8,8 @@ async function main() {
   const depositAddress = "0x4242424242424242424242424242424242424242";
   const depositImplementationAddress =
     "0x1111111111111111111111111111111111111111";
+  const depositImplementationAddress2 =
+    "0xee4e3Fd107BE4097718B8aACFA3a8d2d9349C9a5";
 
   const depositContract = await ethers.getContractAt(
     "DepositImplementation",
@@ -18,6 +20,29 @@ async function main() {
     "DepositProxy",
     depositAddress,
   );
+
+  const tx = await ethers.provider.getTransaction(
+    "0xf4c9340ced5c2b5197c9e553c58aa2781a016be9a8c0654f49bc6bc0ea8203cc",
+  );
+
+  const receipt = await getReceipt(tx);
+
+  // console.log(receipt.status);
+  // console.log(receipt);
+
+  return;
+
+  console.log(
+    await depositContract.upgradeToAndCall(
+      depositImplementationAddress2,
+      "0x",
+      {
+        gasLimit: 1000000, // Increase this as needed
+      },
+    ),
+  );
+
+  return;
 
   if ((await ethers.provider.getBlockNumber()) == 0) {
     throw new Error("Network is not active yet");

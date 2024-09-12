@@ -60,6 +60,7 @@ contract DataLiquidityPoolImplementation is
     error InvalidFileStatus();
     error NotAllowed();
     error InvalidAttestator();
+    error InvalidFileOwner();
 
     struct InitParams {
         address ownerAddress;
@@ -208,8 +209,15 @@ contract DataLiquidityPoolImplementation is
     function addFile(uint256 registryId, uint256 proofIndex) external override whenNotPaused {
         IDataRegistry.Proof memory fileProof = dataRegistry.fileProofs(registryId, proofIndex);
 
+        IDataRegistry.FileResponse memory registryFile = dataRegistry.files(registryId);
+
+        if (registryFile.ownerAddress != msg.sender) {
+            revert InvalidFileOwner();
+        }
+
         bytes32 _messageHash = keccak256(
             abi.encodePacked(
+                registryFile.url,
                 fileProof.data.score,
                 fileProof.data.timestamp,
                 fileProof.data.metadata,

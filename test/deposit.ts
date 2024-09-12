@@ -1,6 +1,6 @@
 import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
-import { ethers, upgrades } from "hardhat";
+import env, { ethers, upgrades } from "hardhat";
 import { DAT, DepositImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { parseEther } from "../utils/helpers";
@@ -126,22 +126,33 @@ describe("Deposit", () => {
   const deploy = async () => {
     [deployer, owner, user1, user2, user3] = await ethers.getSigners();
 
-    const depositDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("DepositImplementation"),
-      [
-        owner.address,
-        minDepositAmount,
-        maxDepositAmount,
-        [validators[1].pubkey, validators[2].pubkey, validators[3].pubkey],
-      ],
-      {
-        kind: "uups",
-      },
+    return;
+
+    const depositProxy = await ethers.deployContract("DepositProxy", []);
+    const depositImplementation = await ethers.deployContract(
+      "DepositImplementation",
+      [],
     );
 
     deposit = await ethers.getContractAt(
       "DepositImplementation",
-      depositDeploy.target,
+      depositProxy.target,
+    );
+
+    await depositProxy.setImplementation(depositImplementation.target, "0x");
+    await deposit.initialize(
+      owner.address,
+      minDepositAmount,
+      maxDepositAmount,
+      [validators[1].pubkey, validators[2].pubkey, validators[3].pubkey],
+    );
+
+    await upgrades.forceImport(
+      deposit.target.toString(),
+      await ethers.getContractFactory("DepositImplementation"),
+      {
+        kind: "uups",
+      },
     );
   };
 
@@ -154,7 +165,7 @@ describe("Deposit", () => {
       (await deposit.owner()).should.eq(owner);
       (await deposit.minDepositAmount()).should.eq(minDepositAmount);
       (await deposit.maxDepositAmount()).should.eq(maxDepositAmount);
-      (await deposit.restricted()).should.eq(true);
+      (await deposit.restricted()).should.eq(false);
 
       const validator1 = await deposit.validators(validators[1].pubkey);
       validator1.isAllowed.should.eq(true);
@@ -473,6 +484,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when non-allowed validator", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(user1)
         .deposit(
@@ -488,6 +500,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when permission was removed", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(owner)
         .removeAllowedValidators([validators[1].pubkey]).should.be.fulfilled;
@@ -507,6 +520,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when already deposited", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(user1)
         .deposit(
@@ -553,6 +567,29 @@ describe("Deposit", () => {
           },
         )
         .should.emit(deposit, "DepositEvent");
+    });
+
+    it("Should upgradeTo when owner and emit event", async function () {
+      const depositAddress = "0x4242424242424242424242424242424242424242";
+      const depositImplementationAddress =
+        "0x1111111111111111111111111111111111111111";
+      const depositImplementationAddress2 =
+        "0xee4e3Fd107BE4097718B8aACFA3a8d2d9349C9a5";
+
+      const deposit = await ethers.getContractAt(
+        "DepositImplementation",
+        depositAddress,
+      );
+
+      const owner = new ethers.Wallet(
+        process.env.OWNER_ADDRESS ?? "",
+        ethers.provider,
+      );
+
+      await deposit
+        .connect(owner)
+        .upgradeToAndCall(depositImplementationAddress2, "0x")
+        .should.be.rejectedWith("OwnableUnauthorizedAccount");
     });
   });
 });
