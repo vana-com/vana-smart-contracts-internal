@@ -243,6 +243,11 @@ contract DataLiquidityPoolOldImplementation is
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     struct InitParams {
         string name;
         address ownerAddress;

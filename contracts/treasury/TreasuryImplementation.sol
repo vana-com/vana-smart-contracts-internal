@@ -17,6 +17,11 @@ contract TreasuryImplementation is
 {
     using SafeERC20 for IERC20;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @notice Used to initialize a new Treasury contract
      *

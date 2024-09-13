@@ -53,7 +53,8 @@ interface IDataLiquidityPoolsRoot {
     }
 
     function version() external pure returns (uint256);
-    function maxNumberOfDlps() external view returns (uint256);
+    function numberOfTopDlps() external view returns (uint256);
+    function maxNumberOfRegisteredDlps() external view returns (uint256);
     function epochSize() external view returns (uint256);
     function registeredDlps() external view returns (uint256[] memory);
     function epochsCount() external view returns (uint256);
@@ -121,7 +122,8 @@ interface IDataLiquidityPoolsRoot {
     function claimableAmount(address stakerAddress, uint256 dlpId) external returns (uint256);
     function pause() external;
     function unpause() external;
-    function updateMaxNumberOfDlps(uint256 newMaxNumberOfDlps) external;
+    function updateNumberOfTopDlps(uint256 newNumberOfTopDlps) external;
+    function updateMaxNumberOfRegisteredDlps(uint256 newMaxNumberOfRegisteredDlps) external;
     function updateEpochSize(uint256 newEpochSize) external;
     function updateEpochRewardAmount(uint256 newEpochRewardAmount) external;
     function updateMinDlpStakeAmount(uint256 newMinStakeAmount) external;

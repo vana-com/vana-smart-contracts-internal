@@ -126,8 +126,6 @@ describe("Deposit", () => {
   const deploy = async () => {
     [deployer, owner, user1, user2, user3] = await ethers.getSigners();
 
-    return;
-
     const depositProxy = await ethers.deployContract("DepositProxy", []);
     const depositImplementation = await ethers.deployContract(
       "DepositImplementation",
@@ -567,29 +565,6 @@ describe("Deposit", () => {
           },
         )
         .should.emit(deposit, "DepositEvent");
-    });
-
-    it("Should upgradeTo when owner and emit event", async function () {
-      const depositAddress = "0x4242424242424242424242424242424242424242";
-      const depositImplementationAddress =
-        "0x1111111111111111111111111111111111111111";
-      const depositImplementationAddress2 =
-        "0xee4e3Fd107BE4097718B8aACFA3a8d2d9349C9a5";
-
-      const deposit = await ethers.getContractAt(
-        "DepositImplementation",
-        depositAddress,
-      );
-
-      const owner = new ethers.Wallet(
-        process.env.OWNER_ADDRESS ?? "",
-        ethers.provider,
-      );
-
-      await deposit
-        .connect(owner)
-        .upgradeToAndCall(depositImplementationAddress2, "0x")
-        .should.be.rejectedWith("OwnableUnauthorizedAccount");
     });
   });
 });

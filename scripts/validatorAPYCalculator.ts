@@ -4,10 +4,10 @@ async function main() {
   const slotsPerEpoch = 64;
   const effectiveBalanceMax = 35000e9;
   const effectiveBalanceIncrement = 1000e9;
-  const baseRewardFactor = 227;
+  const baseRewardFactor = 330;
 
   //reality params
-  const numberOfValidators = 20;
+  const numberOfValidators = 251;
   const numberOfMintedBlocks = 12351;
   const minValidatorReward = (35366335984543 - effectiveBalanceMax) / 5.3333;
   const maxValidatorReward = (35382476019744 - effectiveBalanceMax) / 5.3333;
@@ -74,7 +74,7 @@ async function main() {
 
   console.log(
     // `All (${numberOfValidators}) validators max reward per year: ${(maxRewardPerYear * numberOfValidators) / 1e9} Vana`,
-    `All (${numberOfValidators}) validators max reward after 48 months: ${(1 * (maxRewardPerYear * numberOfValidators)) / 1e9} Vana`,
+    `All (${numberOfValidators}) validators max reward after 48 months: ${(3 * (maxRewardPerYear * numberOfValidators)) / 1e9} Vana`,
   );
 
   const APY0 = 99.64;

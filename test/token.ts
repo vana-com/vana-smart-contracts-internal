@@ -8,7 +8,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 chai.use(chaiAsPromised);
 should();
 
-describe("ERC20Swapper", () => {
+describe("ERC20", () => {
   let deployer: HardhatEthersSigner;
   let owner: HardhatEthersSigner;
   let admin: HardhatEthersSigner;

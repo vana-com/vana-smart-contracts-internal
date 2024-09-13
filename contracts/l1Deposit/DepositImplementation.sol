@@ -28,16 +28,17 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
 
     mapping(bytes pubkey => Validator validator) public validators;
 
+    event MinDepositAmountUpdated(uint256 newMinDepositAmount);
+    event MaxDepositAmountUpdated(uint256 newMaxDepositAmount);
+    event RestrictedUpdated(bool newRestricted);
+    event AllowedValidatorsAdded(bytes validatorPublicKey);
+    event AllowedValidatorsRemoved(bytes validatorPublicKey);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /**
-     * @notice Used to initialize the deposit contract
-     *
-     * @param ownerAddress            Address of the owner
-     */
     function initialize(
         address ownerAddress,
         uint256 _minDepositAmount,
@@ -72,19 +73,23 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
     /**
      * @notice Updates the minDepositAmount
      *
-     * @param _minDepositAmount                  new minDepositAmount
+     * @param newMinDepositAmount                  new minDepositAmount
      */
-    function updateMinDepositAmount(uint256 _minDepositAmount) external onlyOwner {
-        minDepositAmount = _minDepositAmount;
+    function updateMinDepositAmount(uint256 newMinDepositAmount) external onlyOwner {
+        minDepositAmount = newMinDepositAmount;
+
+        emit MinDepositAmountUpdated(newMinDepositAmount);
     }
 
     /**
      * @notice Updates the maxDepositAmount
      *
-     * @param _maxDepositAmount                  new maxDepositAmount
+     * @param newMaxDepositAmount                  new maxDepositAmount
      */
-    function updateMaxDepositAmount(uint256 _maxDepositAmount) external onlyOwner {
-        maxDepositAmount = _maxDepositAmount;
+    function updateMaxDepositAmount(uint256 newMaxDepositAmount) external onlyOwner {
+        maxDepositAmount = newMaxDepositAmount;
+
+        emit MaxDepositAmountUpdated(newMaxDepositAmount);
     }
 
     /**
@@ -94,20 +99,29 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
      */
     function updateRestricted(bool _restricted) external onlyOwner {
         restricted = _restricted;
+
+        emit RestrictedUpdated(_restricted);
     }
 
     function addAllowedValidators(bytes[] memory validatorPublicKeys) external onlyOwner {
         for (uint i = 0; i < validatorPublicKeys.length; i++) {
             validators[validatorPublicKeys[i]].isAllowed = true;
+
+            emit AllowedValidatorsAdded(validatorPublicKeys[i]);
         }
     }
 
     function removeAllowedValidators(bytes[] memory validatorPublicKeys) external onlyOwner {
         for (uint i = 0; i < validatorPublicKeys.length; i++) {
             validators[validatorPublicKeys[i]].isAllowed = false;
+
+            emit AllowedValidatorsRemoved(validatorPublicKeys[i]);
         }
     }
 
+    /**
+     * @notice identical with the original deposit contract from Ethereum 2.0
+     */
     function get_deposit_root() external view override returns (bytes32) {
         bytes32 node;
         uint size = deposit_count;
@@ -119,35 +133,17 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         return sha256(abi.encodePacked(node, to_little_endian_64(uint64(deposit_count)), bytes24(0)));
     }
 
+    /**
+     * @notice identical with the original deposit contract from Ethereum 2.0
+     */
     function get_deposit_count() external view override returns (bytes memory) {
         return to_little_endian_64(uint64(deposit_count));
     }
 
-    function depositGet(
-        bytes calldata pubkey,
-        bytes calldata withdrawal_credentials,
-        bytes calldata signature,
-        bytes32 deposit_data_root,
-        uint256 amount
-    ) external view returns (bytes32) {
-        // Compute deposit data root (`DepositData` hash tree root)
-        bytes32 pubkey_root = sha256(abi.encodePacked(pubkey, bytes16(0)));
-        bytes32 signature_root = sha256(
-            abi.encodePacked(
-                sha256(abi.encodePacked(signature[:64])),
-                sha256(abi.encodePacked(signature[64:], bytes32(0)))
-            )
-        );
-
-        return
-            sha256(
-                abi.encodePacked(
-                    sha256(abi.encodePacked(pubkey_root, withdrawal_credentials)),
-                    sha256(abi.encodePacked(to_little_endian_64(uint64(amount / 1 gwei)), bytes24(0), signature_root))
-                )
-            );
-    }
-
+    /**
+     * @notice similar to the original deposit contract from Ethereum 2.0
+     * the only difference is the restriction of the validators
+     */
     function deposit(
         bytes calldata pubkey,
         bytes calldata withdrawal_credentials,
@@ -223,10 +219,16 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         assert(false);
     }
 
+    /**
+     * @notice identical with the original deposit contract from Ethereum 2.0
+     */
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(ERC165).interfaceId || interfaceId == type(IDeposit).interfaceId;
     }
 
+    /**
+     * @notice identical with the original deposit contract from Ethereum 2.0
+     */
     function to_little_endian_64(uint64 value) public pure returns (bytes memory ret) {
         ret = new bytes(8);
         bytes8 bytesValue = bytes8(value);

@@ -72,12 +72,18 @@ contract TeePoolImplementation is
     error NoActiveTee();
     error NotJobOwner();
     error CancelDelayNotPassed();
+    error TransferFailed();
 
     modifier onlyActiveTee() {
         if (!(_tees[msg.sender].status == TeeStatus.Active)) {
             revert TeeNotActive();
         }
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /**
@@ -315,7 +321,7 @@ contract TeePoolImplementation is
     }
 
     /**
-     * @notice Adds a contribution proof request
+     * @notice Cancels a contribution proof request
      *
      * @param jobId                            id of the job
      */
@@ -334,7 +340,10 @@ contract TeePoolImplementation is
 
         _jobs[jobsCount].status = JobStatus.Canceled;
 
-        payable(msg.sender).transfer(_jobs[jobId].bidAmount);
+        (bool success, ) = payable(msg.sender).call{value: _jobs[jobId].bidAmount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit JobCanceled(jobId);
     }
@@ -372,7 +381,10 @@ contract TeePoolImplementation is
 
         _tees[msg.sender].withdrawnAmount = _tees[msg.sender].amount;
 
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit Claimed(msg.sender, amount);
     }

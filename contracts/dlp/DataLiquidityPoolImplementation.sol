@@ -62,6 +62,11 @@ contract DataLiquidityPoolImplementation is
     error InvalidAttestator();
     error InvalidFileOwner();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     struct InitParams {
         address ownerAddress;
         address tokenAddress;

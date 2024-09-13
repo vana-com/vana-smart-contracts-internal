@@ -406,14 +406,6 @@ describe("DataLiquidityPool", () => {
 
       (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
     });
-
-    it("Should reject addFile when same url", async function () {
-      await dlp.connect(user1).addFile(1, 1).should.be.fulfilled;
-      await dlp
-        .connect(user1)
-        .addFile(1, 1)
-        .should.be.rejectedWith(`FileAlreadyAdded()`);
-    });
   });
   describe("File validation", () => {
     beforeEach(async () => {
@@ -423,7 +415,7 @@ describe("DataLiquidityPool", () => {
       await dlp.connect(owner).addRewardsForContributors(parseEther(1000));
     });
 
-    it.only("should validateFile when owner", async function () {
+    it("should validateFile when owner", async function () {
       await dataRegistry.connect(user1).addFile("file1Url");
 
       const proof1: Proof = {

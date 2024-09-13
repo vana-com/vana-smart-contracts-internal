@@ -9,7 +9,8 @@ import "./IDataLiquidityPoolsRoot.sol";
  * contract which implements DataLiquidityPoolsRootStorageV1
  */
 abstract contract DataLiquidityPoolsRootStorageV1 is IDataLiquidityPoolsRoot {
-    uint256 public override maxNumberOfDlps;
+    uint256 public override maxNumberOfRegisteredDlps;
+    uint256 public override numberOfTopDlps;
     uint256 public override minDlpStakeAmount;
     uint256 public override totalDlpsRewardAmount;
     uint256 public override epochRewardAmount;
