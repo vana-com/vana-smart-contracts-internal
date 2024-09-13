@@ -55,7 +55,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         minDepositAmount = _minDepositAmount;
         maxDepositAmount = _maxDepositAmount;
 
-        for (uint i = 0; i < allowedValidators.length; i++) {
+        for (uint i = 0; i < allowedValidators.length; ++i) {
             validators[allowedValidators[i]].isAllowed = true;
         }
 
@@ -104,7 +104,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
     }
 
     function addAllowedValidators(bytes[] memory validatorPublicKeys) external onlyOwner {
-        for (uint i = 0; i < validatorPublicKeys.length; i++) {
+        for (uint i = 0; i < validatorPublicKeys.length; ++i) {
             validators[validatorPublicKeys[i]].isAllowed = true;
 
             emit AllowedValidatorsAdded(validatorPublicKeys[i]);
@@ -112,7 +112,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
     }
 
     function removeAllowedValidators(bytes[] memory validatorPublicKeys) external onlyOwner {
-        for (uint i = 0; i < validatorPublicKeys.length; i++) {
+        for (uint i = 0; i < validatorPublicKeys.length; ++i) {
             validators[validatorPublicKeys[i]].isAllowed = false;
 
             emit AllowedValidatorsRemoved(validatorPublicKeys[i]);
@@ -167,7 +167,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
         require(msg.value >= minDepositAmount, "DepositContract: deposit value too low");
         require(msg.value % 1 gwei == 0, "DepositContract: deposit value not multiple of gwei");
         uint deposit_amount = msg.value / 1 gwei;
-        require(deposit_amount <= maxDepositAmount, "DepositContract: deposit value too high");
+        require(msg.value <= maxDepositAmount, "DepositContract: deposit value too high");
 
         // Emit `DepositEvent` log
         bytes memory amount = to_little_endian_64(uint64(deposit_amount));
@@ -229,7 +229,7 @@ contract DepositImplementation is UUPSUpgradeable, Ownable2StepUpgradeable, IDep
     /**
      * @notice identical with the original deposit contract from Ethereum 2.0
      */
-    function to_little_endian_64(uint64 value) public pure returns (bytes memory ret) {
+    function to_little_endian_64(uint64 value) internal pure returns (bytes memory ret) {
         ret = new bytes(8);
         bytes8 bytesValue = bytes8(value);
         // Byteswapping during copying to bytes.
