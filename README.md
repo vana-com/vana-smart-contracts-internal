@@ -12,12 +12,17 @@ yarn install
 npx hardhat test
 ```
 
+5. Deploy your own Token & DLP
+```bash
+npx hardhat  eploy --network satori --tags DLPDeploy  
+```
+
 
 
 
 ### Satori deployments:
 DataLiquidityPoolsRoot: ```0x8f514f140034a1C23Cbc31f8D7aCDE78C41AF9E8```
 
-DataRegistry: ```0xDAAD102189FE8D0FE43c1926b109E94D06bD8a97```
+DataRegistry: ```0x63937b885141E905192f00f33E69eccD6301e9c7```
 
-TeePool: ```0x88790ffF10E952ffc13Be22a442616eAfE081594```
+TeePool: ```0xb1D0cB224F6756E7AD52e6f805CDD52c1369b832```

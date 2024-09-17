@@ -12,12 +12,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-  const fileRegistry = await ethers.getContractAt(
-    "FileRegistryImplementation",
-    (await deployments.get("FileRegistryProxy")).address,
+  const dataRegistry = await ethers.getContractAt(
+    "DataRegistryImplementation",
+    (await deployments.get("DataRegistryProxy")).address,
   );
 
-  const initializeParams = [ownerAddress, fileRegistry.target];
+  const initializeParams = [ownerAddress, dataRegistry.target, 100];
 
   const proxyDeploy = await deployProxy(
     deployer,
