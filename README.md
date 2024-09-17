@@ -14,7 +14,7 @@ npx hardhat test
 
 5. Deploy your own Token & DLP
 ```bash
-npx hardhat  eploy --network satori --tags DLPDeploy  
+npx hardhat deploy --network satori --tags DLPDeploy  
 ```
 
 
