@@ -13,7 +13,7 @@ yarn install
 npx hardhat test
 ```
 
-5. Create an `.env` file for the smart contract repo. You will need the owner address and private key. Customize the DLP name, token name, and token symbol as needed.
+5. Create an `.env` file for the smart contract repo. You will need the owner's address and private key. Customize the DLP name, token name, and token symbol as needed.
 
 ```
 DEPLOYER_PRIVATE_KEY=8...7
@@ -44,7 +44,7 @@ npx hardhat verify --network satori <data_liquidity_pools_root_address>
 npx hardhat deploy --network satori --tags DLPDeploy
 ```
 
-This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts using the recommended params for testing. If you need a different setup, you can change them in the `deploy/dlp-deploy.ts` script.
+This will deploy the `DataLiquidityPool` and `DataLiquidityPoolToken` smart contracts using the recommended params for testing. If you need a different setup, you can change it in the `deploy/dlp-deploy.ts` script.
 
 9. Verify the `DataLiquidityPool` and `DataLiquidityPoolToken` contracts:
 
