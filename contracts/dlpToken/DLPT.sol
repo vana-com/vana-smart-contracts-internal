@@ -134,7 +134,7 @@ contract DLPT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
     }
 
     /**
-     * @dev Adds an address to the blockList. This address is not able to transfer any more
+     * @dev Adds an address to the blockList. This address is not able to transfer anymore
      */
     function blockAddress(address addressToBeBlocked) external virtual onlyAdmin {
         _blockList.add(addressToBeBlocked);
