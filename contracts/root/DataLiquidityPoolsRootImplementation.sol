@@ -41,28 +41,11 @@ contract DataLiquidityPoolsRootImplementation is
     event DlpDeregistered(uint256 indexed dlpId);
 
     /**
-     * @notice Triggered when a dlp has been deregistered by the dlp owner
-     *
-     * @param dlpId                              id of the dlp
-     * @param unstakeAmount                     amount unstake
-     * @param penaltyAmount                      penalty amount
-     */
-    event DlpDeregisteredByOwner(uint256 indexed dlpId, uint256 unstakeAmount, uint256 penaltyAmount);
-
-    /**
      * @notice Triggered when a epoch has been created
      *
      * @param epochId                  reward epoch id
      */
     event EpochCreated(uint256 epochId);
-
-    /**
-     * @notice Triggered when owner has updated its scores
-     *
-     * @param dlpIds                       dlp ids
-     * @param scores                       dlp scores
-     */
-    event ScoresUpdated(uint256[] dlpIds, uint256[] scores);
 
     /**
      * @notice Triggered when the max number of registered dlps has been updated
@@ -163,7 +146,6 @@ contract DataLiquidityPoolsRootImplementation is
     error InvalidDlpStatus();
     error TooManyDlps();
     error NotDlpOwner();
-    error WithdrawNotAllowed();
     error ArityMismatch();
     error NotAllowed();
     error InvalidDlpList();
