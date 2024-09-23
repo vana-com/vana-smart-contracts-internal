@@ -1,6 +1,6 @@
 import chai, { should } from "chai";
 import chaiAsPromised from "chai-as-promised";
-import env, { ethers, upgrades } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import { DAT, DepositImplementation } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { parseEther } from "../utils/helpers";
@@ -126,7 +126,7 @@ describe("Deposit", () => {
   const deploy = async () => {
     [deployer, owner, user1, user2, user3] = await ethers.getSigners();
 
-    const dataRegistryDeploy = await upgrades.deployProxy(
+    const depositDeploy = await upgrades.deployProxy(
       await ethers.getContractFactory("DepositImplementation"),
       [
         owner.address,
@@ -141,7 +141,7 @@ describe("Deposit", () => {
 
     deposit = await ethers.getContractAt(
       "DepositImplementation",
-      dataRegistryDeploy.target,
+      depositDeploy.target,
     );
   };
 
