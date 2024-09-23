@@ -8,7 +8,7 @@ import { parseEther } from "../utils/helpers";
 chai.use(chaiAsPromised);
 should();
 
-describe("Deposit", () => {
+describe("Deposit2", () => {
   let deployer: HardhatEthersSigner;
   let owner: HardhatEthersSigner;
   let user1: HardhatEthersSigner;
