@@ -9,6 +9,7 @@ dotenv.config();
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
 };
+
 module.exports = {
   solidity: {
     version: "0.8.24",
@@ -24,15 +25,20 @@ module.exports = {
     satori: {
       url: process.env.SATORI_RPC_URL || "",
       accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined
-          ? [process.env.DEPLOYER_PRIVATE_KEY]
-          : [],
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
+    moksha: {
+      url: process.env.MOKSHA_RPC_URL || "",
+      chainId: 14800,
+      accounts:
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+    }
   },
   etherscan: {
     apiKey: {
       // Is not required by blockscout. Can be any non-empty string
       satori: "abc",
+      moksha: "abc",
     },
     customChains: [
       {
@@ -41,9 +47,17 @@ module.exports = {
         urls: {
           apiURL: process.env.SATORI_API_URL || "",
           browserURL: process.env.SATORI_BROWSER_URL || "",
-        },
+        }
       },
-    ],
+      {
+        network: "moksha",
+        chainId: 14800,
+        urls: {
+          apiURL: "https://api.moksha.vanascan.io/api/",
+          browserURL: "https://moksha.vanascan.io",
+        }
+      }
+    ]
   },
   sourcify: {
     enabled: false,
@@ -63,5 +77,4 @@ module.exports = {
     include: ["../node_module/@openzeppelin/contracts-upgradeable"],
   },
 };
-
 export default config;
