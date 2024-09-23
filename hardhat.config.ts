@@ -39,7 +39,7 @@ module.exports = {
     apiKey: {
       // Is not required by blockscout. Can be any non-empty string
       satori: "abc",
-      moksha: "abc", // Không bắt buộc cho Blockscout, có thể là bất kỳ chuỗi nào không rỗng
+      moksha: "abc", 
     },
     customChains: [
       {
