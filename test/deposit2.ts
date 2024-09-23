@@ -126,22 +126,31 @@ describe("Deposit", () => {
   const deploy = async () => {
     [deployer, owner, user1, user2, user3] = await ethers.getSigners();
 
-    const dataRegistryDeploy = await upgrades.deployProxy(
-      await ethers.getContractFactory("DepositImplementation"),
-      [
-        owner.address,
-        minDepositAmount,
-        maxDepositAmount,
-        [validators[1].pubkey, validators[2].pubkey, validators[3].pubkey],
-      ],
-      {
-        kind: "uups",
-      },
+    const depositProxy = await ethers.deployContract("DepositProxy2", []);
+    const depositImplementation = await ethers.deployContract(
+      "DepositImplementation",
+      [],
     );
 
     deposit = await ethers.getContractAt(
       "DepositImplementation",
-      dataRegistryDeploy.target,
+      depositProxy.target,
+    );
+
+    await depositProxy.setImplementation(depositImplementation.target, "0x");
+    await deposit.initialize(
+      owner.address,
+      minDepositAmount,
+      maxDepositAmount,
+      [validators[1].pubkey, validators[2].pubkey, validators[3].pubkey],
+    );
+
+    await upgrades.forceImport(
+      deposit.target.toString(),
+      await ethers.getContractFactory("DepositImplementation"),
+      {
+        kind: "uups",
+      },
     );
   };
 

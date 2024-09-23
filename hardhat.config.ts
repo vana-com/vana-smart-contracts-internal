@@ -20,27 +20,9 @@ module.exports = {
     },
   },
   networks: {
-    hardhat: {
-      // forking: {
-      //   url: `http://34.30.131.204:8545/`,
-      // },
-    },
+    hardhat: {},
     satori: {
       url: process.env.SATORI_RPC_URL || "",
-      accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined
-          ? [process.env.DEPLOYER_PRIVATE_KEY]
-          : [],
-    },
-    ediPos2: {
-      url: "http://34.72.57.139:8545/",
-      accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined
-          ? [process.env.DEPLOYER_PRIVATE_KEY]
-          : [],
-    },
-    ediPos3: {
-      url: "http://34.30.131.204:8545/",
       accounts:
         process.env.DEPLOYER_PRIVATE_KEY !== undefined
           ? [process.env.DEPLOYER_PRIVATE_KEY]
