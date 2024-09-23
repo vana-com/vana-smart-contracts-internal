@@ -1,13 +1,13 @@
 async function main() {
   //network params
-  const secondsPerSlot = 6;
-  const slotsPerEpoch = 64;
+  const secondsPerSlot = 8;
+  const slotsPerEpoch = 8;
   const effectiveBalanceMax = 35000e9;
   const effectiveBalanceIncrement = 1000e9;
-  const baseRewardFactor = 330;
+  const baseRewardFactor = 55;
 
   //reality params
-  const numberOfValidators = 251;
+  const numberOfValidators = 21;
   const numberOfMintedBlocks = 12351;
   const minValidatorReward = (35366335984543 - effectiveBalanceMax) / 5.3333;
   const maxValidatorReward = (35382476019744 - effectiveBalanceMax) / 5.3333;
