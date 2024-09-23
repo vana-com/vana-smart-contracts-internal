@@ -81,6 +81,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const approveTx = await dlpt.connect(deployer).approve(await dlp.getAddress(), parseEther('3000000'), deployOptions);
     await approveTx.wait();
 
+	console.log("Updating file reward delay...");
+	const updateFileRewardDelayTx = await dlp.connect(deployer).updateFileRewardDelay(0, deployOptions);
+	await updateFileRewardDelayTx.wait();
+
+
     console.log("Adding rewards for validators...");
     const addValidatorRewardTx = await dlp.connect(deployer).addRewardForValidators(parseEther('2000000'), deployOptions);
     await addValidatorRewardTx.wait();
@@ -89,7 +94,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const addContributorRewardTx = await dlp.connect(deployer).addRewardsForContributors(parseEther('1000000'), deployOptions);
     await addContributorRewardTx.wait();
 
-    console.log("Transferring tokens to owner...");
+	console.log("Transferring tokens to owner...");
     const transferTx = await dlpt.connect(deployer).transfer(ownerAddress, parseEther('7000000'), deployOptions);
     await transferTx.wait();
 
