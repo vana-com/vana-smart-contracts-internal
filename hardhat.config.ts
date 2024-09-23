@@ -54,7 +54,7 @@ module.exports = {
         network: "moksha",
         chainId: 14800,
         urls: {
-          apiURL: "https://moksha.vanascan.io/api",
+          apiURL: "https://api.moksha.vanascan.io/api/",
           browserURL: "https://moksha.vanascan.io",
         }
       }
