@@ -41,15 +41,6 @@ contract DataLiquidityPoolsRootImplementation is
     event DlpDeregistered(uint256 indexed dlpId);
 
     /**
-     * @notice Triggered when a dlp has been deregistered by the dlp owner
-     *
-     * @param dlpId                              id of the dlp
-     * @param unstakeAmount                     amount unstake
-     * @param penaltyAmount                      penalty amount
-     */
-    event DlpDeregisteredByOwner(uint256 indexed dlpId, uint256 unstakeAmount, uint256 penaltyAmount);
-
-    /**
      * @notice Triggered when a epoch has been created
      *
      * @param epochId                  reward epoch id
@@ -57,19 +48,18 @@ contract DataLiquidityPoolsRootImplementation is
     event EpochCreated(uint256 epochId);
 
     /**
-     * @notice Triggered when owner has updated its scores
+     * @notice Triggered when the max number of registered dlps has been updated
      *
-     * @param dlpIds                       dlp ids
-     * @param scores                       dlp scores
+     * @param newMaxNumberOfRegisteredDlps           new max number of registered dlps
      */
-    event ScoresUpdated(uint256[] dlpIds, uint256[] scores);
+    event MaxNumberOfRegisteredDlpsUpdated(uint256 newMaxNumberOfRegisteredDlps);
 
     /**
-     * @notice Triggered when the max number of dlps has been updated
+     * @notice Triggered when the max number of top dlps has been updated
      *
-     * @param newMaxNumberOfDlps           new max number of dlps
+     * @param newNumberOfTopDlps           new max number of dlps
      */
-    event MaxNumberOfDlpsUpdated(uint256 newMaxNumberOfDlps);
+    event NumberOfTopDlpsUpdated(uint256 newNumberOfTopDlps);
 
     /**
      * @notice Triggered when the epoch size has been updated
@@ -156,7 +146,6 @@ contract DataLiquidityPoolsRootImplementation is
     error InvalidDlpStatus();
     error TooManyDlps();
     error NotDlpOwner();
-    error WithdrawNotAllowed();
     error ArityMismatch();
     error NotAllowed();
     error InvalidDlpList();
@@ -170,6 +159,7 @@ contract DataLiquidityPoolsRootImplementation is
     error EpochEnded();
     error EpochFinalised();
     error InvalidStakersPercentage();
+    error TransferFailed();
 
     /**
      * @dev Modifier to make a function callable only when the caller is the owner of the dlp
@@ -193,9 +183,15 @@ contract DataLiquidityPoolsRootImplementation is
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     struct InitParams {
         address payable ownerAddress;
-        uint256 maxNumberOfDlps;
+        uint256 maxNumberOfRegisteredDlps;
+        uint256 numberOfTopDlps;
         uint256 minDlpStakeAmount;
         uint256 startBlock;
         uint256 epochSize;
@@ -217,7 +213,8 @@ contract DataLiquidityPoolsRootImplementation is
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        maxNumberOfDlps = params.maxNumberOfDlps;
+        maxNumberOfRegisteredDlps = params.maxNumberOfRegisteredDlps;
+        numberOfTopDlps = params.numberOfTopDlps;
         minDlpStakeAmount = params.minDlpStakeAmount;
         epochSize = params.epochSize;
         epochRewardAmount = params.epochRewardAmount;
@@ -495,14 +492,26 @@ contract DataLiquidityPoolsRootImplementation is
     }
 
     /**
-     * @notice Updates the maximum number of dlps
+     * @notice Updates the maximum number of registered dlps
      *
-     * @param newMaxNumberOfDlps           new maximum number of dlps
+     * @param newMaxNumberOfRegisteredDlps           new maximum number of dlps
      */
-    function updateMaxNumberOfDlps(uint256 newMaxNumberOfDlps) external override onlyOwner whenCurrentEpoch {
-        maxNumberOfDlps = newMaxNumberOfDlps;
+    function updateMaxNumberOfRegisteredDlps(
+        uint256 newMaxNumberOfRegisteredDlps
+    ) external override onlyOwner whenCurrentEpoch {
+        maxNumberOfRegisteredDlps = newMaxNumberOfRegisteredDlps;
 
-        emit MaxNumberOfDlpsUpdated(newMaxNumberOfDlps);
+        emit MaxNumberOfRegisteredDlpsUpdated(newMaxNumberOfRegisteredDlps);
+    }
+    /**
+     * @notice Updates the maximum number of top dlps
+     *
+     * @param newNumberOfTopDlps           new maximum number of dlps
+     */
+    function updateNumberOfTopDlps(uint256 newNumberOfTopDlps) external override onlyOwner whenCurrentEpoch {
+        numberOfTopDlps = newNumberOfTopDlps;
+
+        emit NumberOfTopDlpsUpdated(newNumberOfTopDlps);
     }
 
     /**
@@ -659,11 +668,17 @@ contract DataLiquidityPoolsRootImplementation is
         }
 
         if (dlpOwnerAmount > 0) {
-            dlp.ownerAddress.transfer(dlpOwnerAmount);
+            (bool success, ) = dlp.ownerAddress.call{value: dlpOwnerAmount}("");
+            if (!success) {
+                revert TransferFailed();
+            }
         }
 
         if (dlp.grantedAmount - dlpOwnerAmount > 0) {
-            payable(owner()).transfer(dlp.grantedAmount - dlpOwnerAmount);
+            (bool success, ) = owner().call{value: dlp.grantedAmount - dlpOwnerAmount}("");
+            if (!success) {
+                revert TransferFailed();
+            }
         }
 
         _checkpointForcePush(dlp.stakeAmountCheckpoints, 0);
@@ -779,9 +794,12 @@ contract DataLiquidityPoolsRootImplementation is
                 totalScore;
 
             if (isFinalised && epochDlp.stakersPercentage < 100e18) {
-                payable(_dlps[dlpPerformances[i].dlpId].ownerAddress).transfer(
-                    (epochDlp.rewardAmount * (100e18 - epochDlp.stakersPercentage)) / 100e18
-                );
+                (bool success, ) = _dlps[dlpPerformances[i].dlpId].ownerAddress.call{
+                    value: (epochDlp.rewardAmount * (100e18 - epochDlp.stakersPercentage)) / 100e18
+                }("");
+                if (!success) {
+                    revert TransferFailed();
+                }
             }
         }
 
@@ -887,7 +905,10 @@ contract DataLiquidityPoolsRootImplementation is
         _checkpointPush(dlp.stakeAmountCheckpoints, _subtract, amount);
         _checkpointPush(dlp.stakers[stakerAddress].stakeAmountCheckpoints, _subtract, amount);
 
-        payable(stakerAddress).transfer(amount);
+        (bool success, ) = stakerAddress.call{value: amount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit Unstaked(stakerAddress, dlpId, amount);
     }
@@ -906,6 +927,10 @@ contract DataLiquidityPoolsRootImplementation is
         uint256 stakersPercentage,
         bool granted
     ) internal {
+        if (_registeredDlps.length() >= maxNumberOfRegisteredDlps) {
+            revert TooManyDlps();
+        }
+
         if (dlpIds[dlpAddress] != 0) {
             revert InvalidDlpStatus();
         }
@@ -914,8 +939,8 @@ contract DataLiquidityPoolsRootImplementation is
             revert InvalidStakersPercentage();
         }
 
-        dlpsCount++;
-        Dlp storage dlp = _dlps[dlpsCount];
+        uint256 cachedDlpsCount = ++dlpsCount;
+        Dlp storage dlp = _dlps[cachedDlpsCount];
 
         if (msg.value < minDlpStakeAmount) {
             revert InvalidStakeAmount();
@@ -925,19 +950,19 @@ contract DataLiquidityPoolsRootImplementation is
             dlp.grantedAmount = msg.value;
         }
 
-        dlp.id = dlpsCount;
+        dlp.id = cachedDlpsCount;
         dlp.ownerAddress = dlpOwnerAddress;
         dlp.dlpAddress = dlpAddress;
         dlp.status = DlpStatus.Registered;
         dlp.stakersPercentage = stakersPercentage;
 
-        dlpIds[dlpAddress] = dlpsCount;
+        dlpIds[dlpAddress] = cachedDlpsCount;
 
-        _stake(dlpOwnerAddress, dlpsCount, msg.value);
+        _stake(dlpOwnerAddress, cachedDlpsCount, msg.value);
 
-        _registeredDlps.add(dlpsCount);
+        _registeredDlps.add(cachedDlpsCount);
 
-        emit DlpRegistered(dlpsCount, dlpAddress, dlpOwnerAddress);
+        emit DlpRegistered(cachedDlpsCount, dlpAddress, dlpOwnerAddress);
     }
 
     /**
@@ -982,7 +1007,10 @@ contract DataLiquidityPoolsRootImplementation is
             revert NothingToClaim();
         }
 
-        payable(msg.sender).transfer(totalRewardAmount);
+        (bool success, ) = msg.sender.call{value: totalRewardAmount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
     }
 
     function _checkpointPush(
@@ -1012,7 +1040,7 @@ contract DataLiquidityPoolsRootImplementation is
             return;
         }
 
-        uint256[] memory topDlps = topDlpIds(maxNumberOfDlps);
+        uint256[] memory topDlps = topDlpIds(numberOfTopDlps);
 
         while (lastEpoch.endBlock < blockNumber) {
             epochsCount++;

@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-  const maxNumberOfDlps = 16;
+  const numberOfTopDlps = 16;
   const epochSize = 14400;
   const minDlpStakeAmount = parseEther("0.1");
   const startBlock: number = await getCurrentBlockNumber();
@@ -29,7 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const initializeParams = {
     ownerAddress: deployer.address,
-    maxNumberOfDlps: maxNumberOfDlps,
+    numberOfTopDlps: numberOfTopDlps,
     minDlpStakeAmount: minDlpStakeAmount,
     startBlock: startBlock,
     epochSize: epochSize,

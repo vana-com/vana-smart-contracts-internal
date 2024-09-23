@@ -66,17 +66,24 @@ contract TeePoolImplementation is
     error TeeAlreadyAdded();
     error TeeNotActive();
     error JobCompleted();
+    error InvalidJobStatus();
     error NothingToClaim();
     error InsufficientFee();
     error NoActiveTee();
     error NotJobOwner();
     error CancelDelayNotPassed();
+    error TransferFailed();
 
     modifier onlyActiveTee() {
         if (!(_tees[msg.sender].status == TeeStatus.Active)) {
             revert TeeNotActive();
         }
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /**
@@ -314,22 +321,29 @@ contract TeePoolImplementation is
     }
 
     /**
-     * @notice Adds a contribution proof request
+     * @notice Cancels a contribution proof request
      *
      * @param jobId                            id of the job
      */
-    function cancelJob(uint256 jobId) external override {
+    function cancelJob(uint256 jobId) external override nonReentrant {
         if (_jobs[jobId].ownerAddress != msg.sender) {
             revert NotJobOwner();
+        }
+
+        if (_jobs[jobId].status != JobStatus.Submitted) {
+            revert InvalidJobStatus();
         }
 
         if (_jobs[jobId].addedTimestamp + cancelDelay > block.timestamp) {
             revert CancelDelayNotPassed();
         }
 
-        payable(msg.sender).transfer(_jobs[jobId].bidAmount);
-
         _jobs[jobsCount].status = JobStatus.Canceled;
+
+        (bool success, ) = payable(msg.sender).call{value: _jobs[jobId].bidAmount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit JobCanceled(jobId);
     }
@@ -367,7 +381,10 @@ contract TeePoolImplementation is
 
         _tees[msg.sender].withdrawnAmount = _tees[msg.sender].amount;
 
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit Claimed(msg.sender, amount);
     }

@@ -44,6 +44,11 @@ contract DataRegistryImplementation is
 
     error NotFileOwner();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @notice Initialize the contract
      *
@@ -140,10 +145,11 @@ contract DataRegistryImplementation is
      * @param proof                       proof for the file
      */
     function addProof(uint256 fileId, Proof memory proof) external override whenNotPaused {
-        _files[fileId].proofsCount++;
-        _files[fileId].proofs[_files[fileId].proofsCount] = proof;
+        uint256 cachedProofCount = ++_files[fileId].proofsCount;
 
-        emit ProofAdded(fileId, _files[fileId].proofsCount);
+        _files[fileId].proofs[cachedProofCount] = proof;
+
+        emit ProofAdded(fileId, cachedProofCount);
     }
 
     /**
@@ -168,12 +174,12 @@ contract DataRegistryImplementation is
      * @param url                               url of the file
      */
     function _addFile(string memory url) internal {
-        filesCount++;
+        uint256 cachedFilesCount = ++filesCount;
 
-        _files[filesCount].ownerAddress = msg.sender;
-        _files[filesCount].url = url;
-        _files[filesCount].addedAtBlock = block.number;
+        _files[cachedFilesCount].ownerAddress = msg.sender;
+        _files[cachedFilesCount].url = url;
+        _files[cachedFilesCount].addedAtBlock = block.number;
 
-        emit FileAdded(filesCount, msg.sender, url);
+        emit FileAdded(cachedFilesCount, msg.sender, url);
     }
 }

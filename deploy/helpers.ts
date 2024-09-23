@@ -125,6 +125,8 @@ export async function deployProxy(
     initializeParams,
   );
 
+  console.log(initializeData);
+
   const proxyDeploy = await deployments.deploy(proxyContractName, {
     from: deployer.address,
     args: [implementationDeploy.address, initializeData],

@@ -154,7 +154,7 @@ describe("Deposit", () => {
       (await deposit.owner()).should.eq(owner);
       (await deposit.minDepositAmount()).should.eq(minDepositAmount);
       (await deposit.maxDepositAmount()).should.eq(maxDepositAmount);
-      (await deposit.restricted()).should.eq(true);
+      (await deposit.restricted()).should.eq(false);
 
       const validator1 = await deposit.validators(validators[1].pubkey);
       validator1.isAllowed.should.eq(true);
@@ -473,6 +473,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when non-allowed validator", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(user1)
         .deposit(
@@ -488,6 +489,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when permission was removed", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(owner)
         .removeAllowedValidators([validators[1].pubkey]).should.be.fulfilled;
@@ -507,6 +509,7 @@ describe("Deposit", () => {
     });
 
     it("should reject deposit when already deposited", async function () {
+      await deposit.connect(owner).updateRestricted(true);
       await deposit
         .connect(user1)
         .deposit(
