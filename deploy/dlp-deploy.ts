@@ -1,112 +1,81 @@
-import { ethers, upgrades } from "hardhat";
+import { deployments, ethers } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { parseEther } from "ethers";
-import { env } from "process";
-import { getCurrentBlockNumber } from "../utils/timeAndBlockManipulation";
+import { deployProxy, verifyProxy } from "./helpers";
+import { parseEther } from "../utils/helpers";
+
+const implementationContractName = "DataLiquidityPoolImplementation";
+const proxyContractName = "DataLiquidityPoolProxy";
+const proxyContractPath =
+  "contracts/dlpLight/DataLiquidityPoolProxy.sol:DataLiquidityPoolProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-    const [deployer] = await ethers.getSigners();
+  const [deployer] = await ethers.getSigners();
 
-    const gasPrice = ethers.parseUnits("20", "gwei");
-    const deployOptions = {
-        gasLimit: 5000000,
-        gasPrice: gasPrice
-    };
+  const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
-    console.log(`Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+  const tokenContractName = "DAT";
+  const tokenName = process.env.DLP_TOKEN_NAME ?? "Custom Data Autonomy Token";
+  const tokenSymbol = process.env.DLP_TOKEN_SYMBOL ?? "CUSTOMDAT";
 
-    const dlpName = process.env.DLP_NAME ?? "Custom Data Liquidity Pool";
-    const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
+  console.log(``);
+  console.log(``);
+  console.log(``);
+  console.log(`**************************************************************`);
+  console.log(`**************************************************************`);
+  console.log(`**************************************************************`);
+  console.log(`********** Deploying DAT **********`);
 
-    const tokenName = process.env.DLP_TOKEN_NAME ?? "Custom Data Autonomy Token";
-    const tokenSymbol = process.env.DLP_TOKEN_SYMBOL ?? "CUSTOMDAT";
+  const tokenDeploy = await deployments.deploy(tokenContractName, {
+    from: deployer.address,
+    args: [tokenName, tokenSymbol, deployer.address],
+    log: true,
+  });
 
-    console.log("Deploying DLPT...");
-    const dlptDeploy = await ethers.deployContract("DLPT", [tokenName, tokenSymbol, deployer], deployOptions);
-    await dlptDeploy.waitForDeployment();
-    const dlpt = await ethers.getContractAt("DLPT", await dlptDeploy.getAddress());
+  const token = await ethers.getContractAt("DAT", tokenDeploy.address);
+  const dataRegistry = await ethers.getContractAt(
+    "DataRegistryImplementation",
+    (await deployments.get("DataRegistryProxy")).address,
+  );
+  const teePool = await ethers.getContractAt(
+    "TeePoolImplementation",
+    (await deployments.get("TeePoolProxy")).address,
+  );
 
-    console.log("DataLiquidityPoolToken deployed at:", await dlpt.getAddress());
+  const params = {
+    ownerAddress: ownerAddress,
+    name: "DLP Name",
+    dataRegistryAddress: dataRegistry.target,
+    teePoolAddress: teePool.target,
+    tokenAddress: token.target,
+    masterKey: "masterKey",
+    fileRewardFactor: parseEther(10),
+  };
 
-    const maxNumberOfValidators = 3;
-    const validatorScoreMinTrust = parseEther('0.1');
-    const validatorScoreKappa = parseEther('0.5');
-    const validatorScoreRho = parseEther('1');
-    const validationPeriod = 120;
-    const rewardPeriodSize = 1800;
-    const minStakeAmount  = parseEther('7');
-    const startBlock: number = await getCurrentBlockNumber();
-    const rewardAmount = parseEther('10');
-    const fileRewardFactor = parseEther('5');
-    const fileRewardDelay = 3600 * 24 * 3;
+  const proxyDeploy = await deployProxy(
+    deployer,
+    proxyContractName,
+    implementationContractName,
+    [params],
+  );
 
-    console.log("Deploying DataLiquidityPool...");
-    const dlpDeploy = await upgrades.deployProxy(
-        await ethers.getContractFactory("DataLiquidityPool"),
-        [{
-            name: dlpName,
-            ownerAddress: deployer.address,
-            tokenAddress: await dlpt.getAddress(),
-            newMaxNumberOfValidators: maxNumberOfValidators,
-            newValidatorScoreMinTrust: validatorScoreMinTrust,
-            newValidatorScoreKappa: validatorScoreKappa,
-            newValidatorScoreRho: validatorScoreRho,
-            newValidationPeriod: validationPeriod,
-            newMinStakeAmount: minStakeAmount,
-            startBlock: startBlock,
-            newEpochSize: rewardPeriodSize,
-            newEpochRewardAmount: rewardAmount,
-            newFileRewardFactor: fileRewardFactor,
-            newFileRewardDelay: fileRewardDelay
-        }],
-        {
-            kind: "uups",
-            ...deployOptions
-        }
-    );
-    await dlpDeploy.waitForDeployment();
-    const dlp = await ethers.getContractAt("DataLiquidityPool", await dlpDeploy.getAddress());
+  const dlp = await ethers.getContractAt(
+    implementationContractName,
+    proxyDeploy.proxyAddress,
+  );
 
-    console.log(`DataLiquidityPool "${dlpName}" deployed at:`, await dlp.getAddress());
+  await token.connect(deployer).mint(deployer, parseEther(100000000));
+  await token.connect(deployer).approve(dlp, parseEther(1000000));
+  await dlp.connect(deployer).addRewardsForContributors(parseEther(1000000));
 
-    console.log("Waiting for 10 seconds before continuing...");
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+  await verifyProxy(
+    proxyDeploy.proxyAddress,
+    proxyDeploy.implementationAddress,
+    proxyDeploy.initializeData,
+    proxyContractPath,
+  );
 
-    console.log("Minting tokens...");
-    const mintTx = await dlpt.connect(deployer).mint(deployer.address, parseEther('10000000'), deployOptions);
-    await mintTx.wait();
-
-    console.log("Approving tokens...");
-    const approveTx = await dlpt.connect(deployer).approve(await dlp.getAddress(), parseEther('3000000'), deployOptions);
-    await approveTx.wait();
-
-	console.log("Updating file reward delay...");
-	const updateFileRewardDelayTx = await dlp.connect(deployer).updateFileRewardDelay(0, deployOptions);
-	await updateFileRewardDelayTx.wait();
-
-
-    console.log("Adding rewards for validators...");
-    const addValidatorRewardTx = await dlp.connect(deployer).addRewardForValidators(parseEther('2000000'), deployOptions);
-    await addValidatorRewardTx.wait();
-
-    console.log("Adding rewards for contributors...");
-    const addContributorRewardTx = await dlp.connect(deployer).addRewardsForContributors(parseEther('1000000'), deployOptions);
-    await addContributorRewardTx.wait();
-
-	console.log("Transferring tokens to owner...");
-    const transferTx = await dlpt.connect(deployer).transfer(ownerAddress, parseEther('7000000'), deployOptions);
-    await transferTx.wait();
-
-    console.log("Transferring DLPT ownership...");
-    const transferDlptOwnershipTx = await dlpt.transferOwnership(ownerAddress, deployOptions);
-    await transferDlptOwnershipTx.wait();
-
-    console.log("Transferring DLP ownership...");
-    const transferDlpOwnershipTx = await dlp.transferOwnership(ownerAddress, deployOptions);
-    await transferDlpOwnershipTx.wait();
-
-    console.log("Deployment and setup completed successfully!");
+  return;
 };
 
 export default func;
