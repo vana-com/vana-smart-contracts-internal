@@ -7,6 +7,7 @@ const implementationContractName = "DataRegistryImplementation";
 const proxyContractName = "DataRegistryProxy";
 const proxyContractPath =
   "contracts/dataRegistry/DataRegistryProxy.sol:DataRegistryProxy";
+const saltName = "DataRegistryV1";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const [deployer] = await ethers.getSigners();
@@ -20,6 +21,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     proxyContractName,
     implementationContractName,
     initializeParams,
+    saltName,
   );
 
   await verifyProxy(

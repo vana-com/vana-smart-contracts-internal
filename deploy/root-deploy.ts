@@ -16,6 +16,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const ownerAddress = process.env.OWNER_ADDRESS ?? deployer.address;
 
   const numberOfTopDlps = 16;
+  const maxNumberOfRegisteredDlps = 200;
   const epochSize = 14400;
   const minDlpStakeAmount = parseEther("0.1");
   const startBlock: number = await getCurrentBlockNumber();
@@ -29,6 +30,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const initializeParams = {
     ownerAddress: deployer.address,
+    maxNumberOfRegisteredDlps: maxNumberOfRegisteredDlps,
     numberOfTopDlps: numberOfTopDlps,
     minDlpStakeAmount: minDlpStakeAmount,
     startBlock: startBlock,
@@ -60,7 +62,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     proxyDeploy.proxyAddress,
   );
 
-  await proxy.addRewardForDlps({ value: addRewardToDlpAmount });
+  // await proxy.addRewardForDlps({ value: addRewardToDlpAmount });
   await proxy.transferOwnership(ownerAddress);
 
   await verifyProxy(

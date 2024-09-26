@@ -1,6 +1,7 @@
 import { deployments, ethers, run, upgrades } from "hardhat";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { keccak256, toUtf8Bytes } from "ethers";
 
 export async function getUUPSImplementationAddress(
   proxyAddress: string,
@@ -125,7 +126,14 @@ export async function deployProxy(
     initializeParams,
   );
 
-  console.log(initializeData);
+  // const deterministic = await deployments.deterministic(proxyContractName, {
+  //   from: deployer.address,
+  //   args: [implementationDeploy.address, initializeData],
+  //   log: true,
+  //   salt: keccak256(toUtf8Bytes(salt)),
+  // });
+  //
+  // const proxyDeploy = await deterministic.deploy();
 
   const proxyDeploy = await deployments.deploy(proxyContractName, {
     from: deployer.address,

@@ -34,7 +34,6 @@ interface IDataLiquidityPoolsRoot {
         uint256 lastClaimedEpochId;
         Checkpoints.Trace208 stakeAmountCheckpoints;
         mapping(uint256 epochId => uint256 claimAmount) claimAmounts;
-        Checkpoints.Trace208 unstakeAmountCheckpoints;
     }
 
     struct Dlp {
@@ -47,7 +46,6 @@ interface IDataLiquidityPoolsRoot {
         uint256 grantedAmount;
         Checkpoints.Trace208 stakeAmountCheckpoints;
         mapping(address staker => DlpStaker dlpStaker) stakers;
-        Checkpoints.Trace208 unstakeAmountCheckpoints;
     }
 
     struct Staker {
@@ -121,7 +119,6 @@ interface IDataLiquidityPoolsRoot {
         uint256 epochId
     ) external view returns (StakerDlpEpochInfo memory);
     function topDlpIds(uint256 numberOfDlps) external returns (uint256[] memory);
-    function unstakebleAmount(address stakerAddress, uint256 dlpId) external returns (uint256);
     function claimableAmount(address stakerAddress, uint256 dlpId) external returns (uint256);
     function pause() external;
     function unpause() external;

@@ -23,16 +23,29 @@ module.exports = {
   networks: {
     hardhat: {},
     satori: {
+      gasPrice: 1000000000, // Adjust the gas price (in wei)
+      gas: 5000000, // Optionally adjust the gas limit
       url: process.env.SATORI_RPC_URL || "",
       accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
     },
     moksha: {
       url: process.env.MOKSHA_RPC_URL || "",
       chainId: 14800,
       accounts:
-        process.env.DEPLOYER_PRIVATE_KEY !== undefined ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-    }
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
+    baseSepolia: {
+      url: process.env.BASE_SEPOLIA_RPC_URL || "",
+      accounts:
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
   },
   etherscan: {
     apiKey: {
@@ -47,7 +60,7 @@ module.exports = {
         urls: {
           apiURL: process.env.SATORI_API_URL || "",
           browserURL: process.env.SATORI_BROWSER_URL || "",
-        }
+        },
       },
       {
         network: "moksha",
@@ -55,9 +68,9 @@ module.exports = {
         urls: {
           apiURL: "https://api.moksha.vanascan.io/api/",
           browserURL: "https://moksha.vanascan.io",
-        }
-      }
-    ]
+        },
+      },
+    ],
   },
   sourcify: {
     enabled: false,

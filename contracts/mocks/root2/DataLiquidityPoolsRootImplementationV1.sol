@@ -10,9 +10,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/DataLiquidityPoolsRootStorageV1.sol";
 
-import "hardhat/console.sol";
-
-contract DataLiquidityPoolsRootImplementation is
+contract DataLiquidityPoolsRootImplementationV1 is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
@@ -266,7 +264,7 @@ contract DataLiquidityPoolsRootImplementation is
                 id: dlp.id,
                 dlpAddress: dlp.dlpAddress,
                 ownerAddress: dlp.ownerAddress,
-                stakeAmount: _dlpComputedStakeAmount(dlpId),
+                stakeAmount: dlp.stakeAmountCheckpoints.latest(),
                 status: dlp.status,
                 registrationBlockNumber: dlp.registrationBlockNumber,
                 grantedAmount: dlp.grantedAmount,
@@ -320,7 +318,9 @@ contract DataLiquidityPoolsRootImplementation is
                 tfc: epochDlp.tfc,
                 vdu: epochDlp.vdu,
                 uw: epochDlp.uw,
-                stakeAmount: _dlpComputedStakeAmountByBlock(dlpId, SafeCast.toUint48(_epochs[epochId].startBlock - 1)),
+                stakeAmount: _dlps[dlpId].stakeAmountCheckpoints.upperLookup(
+                    SafeCast.toUint48(_epochs[epochId].startBlock - 1)
+                ),
                 isTopDlp: _epochs[epochId].dlpIds.contains(dlpId),
                 rewardAmount: epochDlp.rewardAmount,
                 stakersPercentage: epochDlp.stakersPercentage
@@ -344,7 +344,7 @@ contract DataLiquidityPoolsRootImplementation is
         return
             StakerDlpInfo({
                 dlpId: dlpId,
-                stakeAmount: _stakerComputedStakeAmount(stakerAddress, dlpId),
+                stakeAmount: _dlps[dlpId].stakers[stakerAddress].stakeAmountCheckpoints.latest(),
                 lastClaimedEpochId: _dlps[dlpId].stakers[stakerAddress].lastClaimedEpochId
             });
     }
@@ -362,7 +362,7 @@ contract DataLiquidityPoolsRootImplementation is
             uint256 dlpId = staker.dlpIds.at(i);
             stakerDlpsList[i] = StakerDlpInfo({
                 dlpId: dlpId,
-                stakeAmount: _stakerComputedStakeAmount(stakerAddress, dlpId),
+                stakeAmount: _dlps[dlpId].stakers[stakerAddress].stakeAmountCheckpoints.latest(),
                 lastClaimedEpochId: _dlps[dlpId].stakers[stakerAddress].lastClaimedEpochId
             });
         }
@@ -382,9 +382,7 @@ contract DataLiquidityPoolsRootImplementation is
         uint256 dlpId,
         uint256 epochId
     ) external view override returns (StakerDlpEpochInfo memory) {
-        uint256 stakeAmount = _stakerComputedStakeAmountByBlock(
-            staker,
-            dlpId,
+        uint256 stakeAmount = _dlps[dlpId].stakers[staker].stakeAmountCheckpoints.upperLookup(
             SafeCast.toUint48(_epochs[epochId].startBlock - 1)
         );
 
@@ -403,28 +401,9 @@ contract DataLiquidityPoolsRootImplementation is
     }
 
     /**
-     * @notice Gets the unstakeble amount for a staker for a dlp
-     *
-     * @param stakerAddress                 address of the staker
-     * @param dlpId                         id of the dlp
-     */
-    function unstakebleAmount(address stakerAddress, uint256 dlpId) public view override returns (uint256) {
-        uint48 checkBlock = SafeCast.toUint48(block.number > epochSize ? block.number - epochSize : 0);
-
-        uint256 unstakebleAmount = _dlps[dlpId].stakers[stakerAddress].stakeAmountCheckpoints.upperLookup(checkBlock) -
-            _dlps[dlpId].stakers[stakerAddress].unstakeAmountCheckpoints.latest();
-
-        if (stakerAddress == _dlps[dlpId].ownerAddress) {
-            unstakebleAmount = minDlpStakeAmount < unstakebleAmount ? unstakebleAmount - minDlpStakeAmount : 0;
-        }
-
-        return unstakebleAmount;
-    }
-
-    /**
      * @notice Gets the claimable amount for a staker for a dlp
      *
-     * @param stakerAddress                 address of the staker
+     * @param stakerAddress                        address of the staker
      * @param dlpId                         id of the dlp
      */
     function claimableAmount(address stakerAddress, uint256 dlpId) external view override returns (uint256) {
@@ -443,21 +422,10 @@ contract DataLiquidityPoolsRootImplementation is
                 break;
             }
 
-            uint256 stakeAmount = _stakerComputedStakeAmountByBlock(
-                stakerAddress,
-                dlpId,
-                SafeCast.toUint48(epoch.startBlock - 1)
-            );
-
             totalRewardAmount += epochDlp.stakeAmount > 0
-                ? (((stakeAmount * epochDlp.rewardAmount) / epochDlp.stakeAmount) * epochDlp.stakersPercentage) / 100e18
+                ? (((dlpStaker.stakeAmountCheckpoints.upperLookup(SafeCast.toUint48(epoch.startBlock - 1)) *
+                    epochDlp.rewardAmount) / epochDlp.stakeAmount) * epochDlp.stakersPercentage) / 100e18
                 : 0;
-
-            console.log(stakeAmount);
-            console.log(epochDlp.rewardAmount);
-            console.log(epochDlp.stakersPercentage);
-            console.log(epochDlp.stakeAmount);
-            console.log(totalRewardAmount);
         }
 
         return totalRewardAmount;
@@ -484,7 +452,7 @@ contract DataLiquidityPoolsRootImplementation is
 
         for (uint256 i = 0; i < registeredDlpsCount; i++) {
             uint256 currentDlpId = registeredDlpIds[i];
-            uint256 currentStake = _dlpComputedStakeAmount(currentDlpId);
+            uint256 currentStake = _dlps[currentDlpId].stakeAmountCheckpoints.latest();
 
             // Find the position where this DLP's stake would be placed
             uint256 position = numberOfDlps;
@@ -672,7 +640,7 @@ contract DataLiquidityPoolsRootImplementation is
 
         emit DlpDeregistered(dlpId);
 
-        uint256 dlpOwnerStakeAmount = _stakerComputedStakeAmount(msg.sender, dlpId) - dlp.grantedAmount;
+        uint256 dlpOwnerStakeAmount = dlp.stakers[dlp.ownerAddress].stakeAmountCheckpoints.latest() - dlp.grantedAmount;
 
         if (dlpOwnerStakeAmount > 0) {
             _unstake(dlp.ownerAddress, dlp.id, dlpOwnerStakeAmount);
@@ -695,7 +663,7 @@ contract DataLiquidityPoolsRootImplementation is
             revert InvalidDlpStatus();
         }
 
-        if (_stakerComputedStakeAmount(dlp.ownerAddress, dlpId) == 0) {
+        if (dlp.stakers[dlp.ownerAddress].stakeAmountCheckpoints.latest() == 0) {
             revert AlreadyDistributed();
         }
 
@@ -713,8 +681,8 @@ contract DataLiquidityPoolsRootImplementation is
             }
         }
 
-        _checkpointPush(dlp.unstakeAmountCheckpoints, dlp.grantedAmount);
-        _checkpointPush(dlp.stakers[dlp.ownerAddress].unstakeAmountCheckpoints, dlp.grantedAmount);
+        _checkpointForcePush(dlp.stakeAmountCheckpoints, 0);
+        _checkpointForcePush(dlp.stakers[dlp.ownerAddress].stakeAmountCheckpoints, 0);
     }
 
     /**
@@ -880,8 +848,23 @@ contract DataLiquidityPoolsRootImplementation is
      * @param amount                              amount to unstake
      */
     function unstake(uint256 dlpId, uint256 amount) external override whenCurrentEpoch {
-        if (amount > unstakebleAmount(msg.sender, dlpId)) {
+        if (
+            amount >
+            _dlps[dlpId].stakers[msg.sender].stakeAmountCheckpoints.upperLookup(
+                SafeCast.toUint48(block.number > epochSize ? block.number - epochSize : 0)
+            )
+        ) {
             revert InvalidUnstakeAmount();
+        }
+
+        Dlp storage dlp = _dlps[dlpId];
+
+        if (msg.sender == dlp.ownerAddress) {
+            uint256 stakeAmount = _dlps[dlpId].stakers[msg.sender].stakeAmountCheckpoints.latest();
+
+            if (stakeAmount - amount < dlp.grantedAmount || stakeAmount - amount < minDlpStakeAmount) {
+                revert InvalidUnstakeAmount();
+            }
         }
 
         _unstake(msg.sender, dlpId, amount);
@@ -901,14 +884,9 @@ contract DataLiquidityPoolsRootImplementation is
 
         staker.dlpIds.add(dlpId);
 
-        console.log("_stake---------------------------------");
-        console.log("dlpId: ", dlpId);
-        console.log("_stake before: ", dlp.stakeAmountCheckpoints.latest());
+        _checkpointPush(dlp.stakeAmountCheckpoints, _add, amount);
+        (uint224 pos, ) = _checkpointPush(dlp.stakers[stakerAddress].stakeAmountCheckpoints, _add, amount);
 
-        _checkpointPush(dlp.stakeAmountCheckpoints, amount);
-        (uint224 pos, ) = _checkpointPush(dlp.stakers[stakerAddress].stakeAmountCheckpoints, amount);
-
-        console.log("_stake after: ", dlp.stakeAmountCheckpoints.latest());
         DlpStaker storage dlpStaker = dlp.stakers[stakerAddress];
 
         if (pos == 0) {
@@ -924,14 +902,8 @@ contract DataLiquidityPoolsRootImplementation is
     function _unstake(address stakerAddress, uint256 dlpId, uint256 amount) internal {
         Dlp storage dlp = _dlps[dlpId];
 
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-
-        _checkpointPush(dlp.unstakeAmountCheckpoints, amount);
-        _checkpointPush(dlp.stakers[stakerAddress].unstakeAmountCheckpoints, amount);
+        _checkpointPush(dlp.stakeAmountCheckpoints, _subtract, amount);
+        _checkpointPush(dlp.stakers[stakerAddress].stakeAmountCheckpoints, _subtract, amount);
 
         (bool success, ) = stakerAddress.call{value: amount}("");
         if (!success) {
@@ -1015,14 +987,9 @@ contract DataLiquidityPoolsRootImplementation is
 
             dlpStaker.lastClaimedEpochId++;
 
-            uint256 stakeAmount = _stakerComputedStakeAmountByBlock(
-                msg.sender,
-                dlpId,
-                SafeCast.toUint48(epoch.startBlock - 1)
-            );
-
             rewardAmount = epochDlp.stakeAmount > 0
-                ? (((stakeAmount * epochDlp.rewardAmount) / epochDlp.stakeAmount) * epochDlp.stakersPercentage) / 100e18
+                ? (((dlpStaker.stakeAmountCheckpoints.upperLookup(SafeCast.toUint48(epoch.startBlock - 1)) *
+                    epochDlp.rewardAmount) / epochDlp.stakeAmount) * epochDlp.stakersPercentage) / 100e18
                 : 0;
 
             if (rewardAmount == 0) {
@@ -1046,47 +1013,19 @@ contract DataLiquidityPoolsRootImplementation is
         }
     }
 
-    function _checkpointPush(Checkpoints.Trace208 storage store, uint256 delta) private returns (uint208, uint208) {
-        return store.push(SafeCast.toUint48(block.number), store.latest() + SafeCast.toUint208(delta));
+    function _checkpointPush(
+        Checkpoints.Trace208 storage store,
+        function(uint208, uint208) view returns (uint208) op,
+        uint256 delta
+    ) private returns (uint208, uint208) {
+        return store.push(SafeCast.toUint48(block.number), op(store.latest(), SafeCast.toUint208(delta)));
     }
 
-    function _stakerComputedStakeAmountByBlock(
-        address stakerAddress,
-        uint256 dlpId,
-        uint48 checkBlock
-    ) internal view returns (uint256) {
-        return
-            _dlps[dlpId].stakers[stakerAddress].stakeAmountCheckpoints.upperLookup(checkBlock) -
-            _dlps[dlpId].stakers[stakerAddress].unstakeAmountCheckpoints.upperLookup(checkBlock);
-    }
-
-    function _stakerComputedStakeAmount(address stakerAddress, uint256 dlpId) internal view returns (uint256) {
-        return
-            _dlps[dlpId].stakers[stakerAddress].stakeAmountCheckpoints.latest() -
-            _dlps[dlpId].stakers[stakerAddress].unstakeAmountCheckpoints.latest();
-    }
-
-    function _dlpComputedStakeAmountByBlock(uint256 dlpId, uint48 checkBlock) internal view returns (uint256) {
-        console.log("_dlpComputedStakeAmountByBlock");
-        console.log("dlpId: ", dlpId);
-        console.log("checkBlock: ", checkBlock);
-        console.log(
-            "_dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock): ",
-            _dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock)
-        );
-        console.log(
-            "_dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock): ",
-            _dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock)
-        );
-        console.log("_dlps[dlpId].stakeAmountCheckpoints.latest(): ", _dlps[dlpId].stakeAmountCheckpoints.latest());
-
-        return
-            _dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock) -
-            _dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock);
-    }
-
-    function _dlpComputedStakeAmount(uint256 dlpId) internal view returns (uint256) {
-        return _dlps[dlpId].stakeAmountCheckpoints.latest() - _dlps[dlpId].unstakeAmountCheckpoints.latest();
+    function _checkpointForcePush(
+        Checkpoints.Trace208 storage store,
+        uint256 delta
+    ) private returns (uint208, uint208) {
+        return store.push(SafeCast.toUint48(block.number), SafeCast.toUint208(delta));
     }
 
     /**
@@ -1103,8 +1042,6 @@ contract DataLiquidityPoolsRootImplementation is
 
         uint256[] memory topDlps = topDlpIds(numberOfTopDlps);
 
-        console.log("--------------------");
-
         while (lastEpoch.endBlock < blockNumber) {
             epochsCount++;
 
@@ -1114,22 +1051,12 @@ contract DataLiquidityPoolsRootImplementation is
             newEpoch.endBlock = newEpoch.startBlock + epochSize - 1;
             newEpoch.rewardAmount = epochRewardAmount;
 
-            console.log("epochsCount: ", epochsCount);
-
             uint256 index;
             for (index = 0; index < topDlps.length; index++) {
                 newEpoch.dlpIds.add(topDlps[index]);
-                console.log("*******");
-                console.log("index: ", index);
-                console.log("topDlps[index]: ", topDlps[index]);
-
-                newEpoch.dlps[topDlps[index]].stakeAmount = _dlpComputedStakeAmountByBlock(
-                    topDlps[index],
+                newEpoch.dlps[topDlps[index]].stakeAmount = _dlps[topDlps[index]].stakeAmountCheckpoints.upperLookup(
                     SafeCast.toUint48(lastEpoch.endBlock)
                 );
-
-                console.log("newEpoch.dlps[topDlps[index]].stakeAmount: ", newEpoch.dlps[topDlps[index]].stakeAmount);
-
                 newEpoch.dlps[topDlps[index]].stakersPercentage = _dlps[topDlps[index]].stakersPercentage;
             }
 
@@ -1137,5 +1064,13 @@ contract DataLiquidityPoolsRootImplementation is
 
             emit EpochCreated(epochsCount);
         }
+    }
+
+    function _add(uint208 a, uint208 b) private pure returns (uint208) {
+        return a + b;
+    }
+
+    function _subtract(uint208 a, uint208 b) private pure returns (uint208) {
+        return a - b;
     }
 }

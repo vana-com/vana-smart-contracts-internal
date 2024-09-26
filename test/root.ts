@@ -1949,10 +1949,14 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(10));
+
       const tx2 = await root.connect(user1).unstake(1, parseEther(4));
       const receipt2 = await getReceipt(tx2);
 
       await tx2.should.emit(root, "Unstaked").withArgs(user1, 1, parseEther(4));
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(6));
 
       await advanceToEpochN(2);
       await root.createEpochs();
@@ -2016,15 +2020,21 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(10));
+
       const tx2 = await root.connect(user1).unstake(1, parseEther(1));
       const receipt2 = await getReceipt(tx2);
 
       await tx2.should.emit(root, "Unstaked").withArgs(user1, 1, parseEther(1));
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(9));
+
       const tx3 = await root.connect(user1).unstake(1, parseEther(3));
       const receipt3 = await getReceipt(tx3);
 
       await tx3.should.emit(root, "Unstaked").withArgs(user1, 1, parseEther(3));
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(6));
 
       await advanceToEpochN(2);
       await root.createEpochs();
@@ -2092,12 +2102,16 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(10));
+
       const tx2 = await root.connect(user1).unstake(1, parseEther(10));
       const receipt2 = await getReceipt(tx2);
 
       await tx2.should
         .emit(root, "Unstaked")
         .withArgs(user1, 1, parseEther(10));
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(0));
 
       await advanceToEpochN(2);
       await root.createEpochs();
@@ -2158,6 +2172,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(10));
+
       await root
         .connect(user1)
         .unstake(1, parseEther(11))
@@ -2170,6 +2186,8 @@ describe("DataLiquidityPoolsRoot", () => {
       await root.connect(user1).stake(1, { value: parseEther(10) });
 
       await advanceBlockNTimes(epochSize / 2);
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(0));
 
       await root
         .connect(user1)
@@ -2189,6 +2207,8 @@ describe("DataLiquidityPoolsRoot", () => {
 
       await advanceToEpochN(3);
       await root.createEpochs();
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(0));
 
       await root
         .connect(user1)
@@ -2211,12 +2231,16 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(parseEther(60));
+
       const tx2 = await root.connect(dlp1Owner).unstake(1, parseEther(4));
       const receipt2 = await getReceipt(tx2);
 
       await tx2.should
         .emit(root, "Unstaked")
         .withArgs(dlp1Owner, 1, parseEther(4));
+
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(parseEther(56));
 
       await advanceToEpochN(2);
       await root.createEpochs();
@@ -2278,8 +2302,12 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceBlockNTimes(epochSize / 2);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(parseEther(50));
+
       const tx2 = await root.connect(dlp1Owner).unstake(1, parseEther(20));
       const receipt2 = await getReceipt(tx2);
+
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(parseEther(30));
 
       await tx2.should
         .emit(root, "Unstaked")
@@ -2341,10 +2369,17 @@ describe("DataLiquidityPoolsRoot", () => {
       await advanceToEpochN(1);
       await root.createEpochs();
 
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(
+        parseEther(100) - minDlpStakeAmount,
+      );
+
+      (await root.unstakebleAmount(dlp1Owner, 1)).should.eq(parseEther(50));
+
       await root.connect(dlp1Owner).unstake(1, parseEther(50)).should.be
         .fulfilled;
 
-      (await root.dlps(1)).stakeAmount.should.eq(minDlpStakeAmount);
+      (await root.unstakebleAmount(user1, 1)).should.eq(0);
+
       (await root.dlps(1)).stakeAmount.should.eq(minDlpStakeAmount);
 
       await root
@@ -2370,12 +2405,16 @@ describe("DataLiquidityPoolsRoot", () => {
       const tx2 = await root.connect(user1).stake(1, { value: parseEther(5) });
       const receipt2 = await getReceipt(tx2);
 
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(10));
+
       const tx3 = await root.connect(user1).unstake(1, parseEther(10));
       const receipt3 = await getReceipt(tx3);
 
       await tx3.should
         .emit(root, "Unstaked")
         .withArgs(user1, 1, parseEther(10));
+
+      (await root.unstakebleAmount(user1, 1)).should.eq(parseEther(0));
 
       await advanceToEpochN(2);
       await root.createEpochs();
