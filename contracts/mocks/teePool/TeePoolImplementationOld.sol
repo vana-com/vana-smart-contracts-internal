@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/TeePoolStorageV1.sol";
 
-contract TeePoolImplementation is
+contract TeePoolImplementationOld is
     UUPSUpgradeable,
     PausableUpgradeable,
     Ownable2StepUpgradeable,
@@ -338,7 +338,7 @@ contract TeePoolImplementation is
             revert CancelDelayNotPassed();
         }
 
-        _jobs[jobId].status = JobStatus.Canceled;
+        _jobs[jobsCount].status = JobStatus.Canceled;
 
         (bool success, ) = payable(msg.sender).call{value: _jobs[jobId].bidAmount}("");
         if (!success) {

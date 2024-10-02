@@ -282,9 +282,11 @@ contract DataLiquidityPoolImplementation is
             revert WithdrawNotAllowed();
         }
 
+        IDataRegistry.FileResponse memory registryFile = dataRegistry.files(file.registryId);
+
         file.status = FileStatus.Validated;
         file.rewardWithdrawn = file.rewardAmount;
-        token.safeTransfer(msg.sender, file.rewardAmount);
+        token.safeTransfer(registryFile.ownerAddress, file.rewardAmount);
 
         emit FileValidated(fileId);
     }

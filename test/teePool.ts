@@ -605,7 +605,7 @@ describe("TeePool", () => {
         .should.be.rejectedWith("InsufficientFee()");
     });
 
-    it("should cancelJob without bid when teeFee != 0", async function () {
+    it("should cancelJob with bid when teeFee != 0", async function () {
       await teePool.connect(owner).updateTeeFee(parseEther(0.1));
 
       const user1InitialBalance = await ethers.provider.getBalance(user1);
@@ -644,6 +644,138 @@ describe("TeePool", () => {
       job1After.fileId.should.eq(1);
       job1After.ownerAddress.should.eq(user1.address);
       job1After.status.should.eq(JobStatus.Canceled);
+    });
+
+    it("should cancelJob when multiple jobs #1", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1));
+
+      const user1InitialBalance = await ethers.provider.getBalance(user1);
+
+      const tx1 = await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.1) });
+
+      await tx1.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(1, 1, parseEther(0.1));
+
+      const tx2 = await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.2) });
+
+      await tx2.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(2, 1, parseEther(0.2));
+
+      (await teePool.jobsCount()).should.eq(2);
+
+      const job1Before = await teePool.jobs(1);
+      job1Before.bidAmount.should.eq(parseEther(0.1));
+      job1Before.fileId.should.eq(1);
+      job1Before.addedTimestamp.should.eq(
+        (await getCurrentBlockTimestamp()) - 1,
+      );
+      job1Before.ownerAddress.should.eq(user1.address);
+      job1Before.status.should.eq(JobStatus.Submitted);
+
+      const job2Before = await teePool.jobs(2);
+      job2Before.bidAmount.should.eq(parseEther(0.2));
+      job2Before.fileId.should.eq(1);
+      job2Before.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job2Before.ownerAddress.should.eq(user1.address);
+      job2Before.status.should.eq(JobStatus.Submitted);
+
+      await advanceNSeconds(cancelDelay);
+      await advanceBlockNTimes(1);
+      const tx3 = await teePool.connect(user1).cancelJob(1);
+
+      await tx3.should.emit(teePool, "JobCanceled").withArgs(1);
+
+      (await ethers.provider.getBalance(user1.address)).should.eq(
+        user1InitialBalance -
+          (await getReceipt(tx1)).fee -
+          (await getReceipt(tx2)).fee -
+          (await getReceipt(tx3)).fee -
+          parseEther(0.2),
+      );
+
+      const job1After = await teePool.jobs(1);
+      job1After.bidAmount.should.eq(parseEther(0.1));
+      job1After.fileId.should.eq(1);
+      job1After.ownerAddress.should.eq(user1.address);
+      job1After.status.should.eq(JobStatus.Canceled);
+
+      const job2After = await teePool.jobs(2);
+      job2After.bidAmount.should.eq(parseEther(0.2));
+      job2After.fileId.should.eq(1);
+      job2After.ownerAddress.should.eq(user1.address);
+      job2After.status.should.eq(JobStatus.Submitted);
+    });
+
+    it("should cancelJob when multiple jobs #2", async function () {
+      await teePool.connect(owner).updateTeeFee(parseEther(0.1));
+
+      const user1InitialBalance = await ethers.provider.getBalance(user1);
+
+      const tx1 = await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.1) });
+
+      await tx1.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(1, 1, parseEther(0.1));
+
+      const tx2 = await teePool
+        .connect(user1)
+        .requestContributionProof(1, { value: parseEther(0.2) });
+
+      await tx2.should
+        .emit(teePool, "JobSubmitted")
+        .withArgs(2, 1, parseEther(0.2));
+
+      (await teePool.jobsCount()).should.eq(2);
+
+      const job1Before = await teePool.jobs(1);
+      job1Before.bidAmount.should.eq(parseEther(0.1));
+      job1Before.fileId.should.eq(1);
+      job1Before.addedTimestamp.should.eq(
+        (await getCurrentBlockTimestamp()) - 1,
+      );
+      job1Before.ownerAddress.should.eq(user1.address);
+      job1Before.status.should.eq(JobStatus.Submitted);
+
+      const job2Before = await teePool.jobs(2);
+      job2Before.bidAmount.should.eq(parseEther(0.2));
+      job2Before.fileId.should.eq(1);
+      job2Before.addedTimestamp.should.eq(await getCurrentBlockTimestamp());
+      job2Before.ownerAddress.should.eq(user1.address);
+      job2Before.status.should.eq(JobStatus.Submitted);
+
+      await advanceNSeconds(cancelDelay);
+      await advanceBlockNTimes(1);
+      const tx3 = await teePool.connect(user1).cancelJob(2);
+
+      await tx3.should.emit(teePool, "JobCanceled").withArgs(2);
+
+      (await ethers.provider.getBalance(user1.address)).should.eq(
+        user1InitialBalance -
+          (await getReceipt(tx1)).fee -
+          (await getReceipt(tx2)).fee -
+          (await getReceipt(tx3)).fee -
+          parseEther(0.1),
+      );
+
+      const job1After = await teePool.jobs(1);
+      job1After.bidAmount.should.eq(parseEther(0.1));
+      job1After.fileId.should.eq(1);
+      job1After.ownerAddress.should.eq(user1.address);
+      job1After.status.should.eq(JobStatus.Submitted);
+
+      const job2After = await teePool.jobs(2);
+      job2After.bidAmount.should.eq(parseEther(0.2));
+      job2After.fileId.should.eq(1);
+      job2After.ownerAddress.should.eq(user1.address);
+      job2After.status.should.eq(JobStatus.Canceled);
     });
 
     it("should cancelJob without bid when teeFee = 0", async function () {

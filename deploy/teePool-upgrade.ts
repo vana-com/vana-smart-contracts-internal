@@ -3,11 +3,10 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyProxy } from "./helpers";
 
-const implementationContractName = "DataRegistryImplementation";
-const previousImplementationContractName = "DataRegistryImplementationOld";
-const proxyContractName = "DataRegistryProxy";
-const proxyContractPath =
-  "contracts/dataRegistry/DataRegistryProxy.sol:DataRegistryProxy";
+const implementationContractName = "TeePoolImplementation";
+const previousImplementationContractName = "TeePoolImplementationOld";
+const proxyContractName = "TeePoolProxy";
+const proxyContractPath = "contracts/teePool/TeePoolProxy.sol:TeePoolProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const [deployer] = await ethers.getSigners();
@@ -52,4 +51,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["DataRegistryUpgrade"];
+func.tags = ["TeePoolUpgrade"];

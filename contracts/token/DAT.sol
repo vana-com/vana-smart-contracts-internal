@@ -148,7 +148,6 @@ contract DAT is ERC20, ERC20Permit, ERC20Votes, Ownable2Step {
         address oldAdmin = admin;
         admin = newAdmin;
         emit AdminChanged(oldAdmin, newAdmin);
-        (oldAdmin, newAdmin);
     }
 
     /**
