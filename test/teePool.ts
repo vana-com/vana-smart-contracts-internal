@@ -765,7 +765,7 @@ describe("TeePool", () => {
       const proof1Info = await dataRegistry.fileProofs(1, 1);
       proof1Info.signature.should.eq(proofs[1].signature);
       proof1Info.data.score.should.eq(proofs[1].data.score);
-      proof1Info.data.timestamp.should.eq(proofs[1].data.timestamp);
+      proof1Info.data.dlpId.should.eq(proofs[1].data.dlpId);
       proof1Info.data.metadata.should.eq(proofs[1].data.metadata);
       proof1Info.data.proofUrl.should.eq(proofs[1].data.proofUrl);
       proof1Info.data.instruction.should.eq(proofs[1].data.instruction);
@@ -820,7 +820,7 @@ describe("TeePool", () => {
       const proof1Info = await dataRegistry.fileProofs(1, 1);
       proof1Info.signature.should.eq(proofs[1].signature);
       proof1Info.data.score.should.eq(proofs[1].data.score);
-      proof1Info.data.timestamp.should.eq(proofs[1].data.timestamp);
+      proof1Info.data.dlpId.should.eq(proofs[1].data.dlpId);
       proof1Info.data.metadata.should.eq(proofs[1].data.metadata);
       proof1Info.data.proofUrl.should.eq(proofs[1].data.proofUrl);
       proof1Info.data.instruction.should.eq(proofs[1].data.instruction);
@@ -828,7 +828,7 @@ describe("TeePool", () => {
       const proof2Info = await dataRegistry.fileProofs(2, 1);
       proof2Info.signature.should.eq(proofs[2].signature);
       proof2Info.data.score.should.eq(proofs[2].data.score);
-      proof2Info.data.timestamp.should.eq(proofs[2].data.timestamp);
+      proof2Info.data.dlpId.should.eq(proofs[2].data.dlpId);
       proof2Info.data.metadata.should.eq(proofs[2].data.metadata);
       proof2Info.data.proofUrl.should.eq(proofs[2].data.proofUrl);
       proof2Info.data.instruction.should.eq(proofs[2].data.instruction);
@@ -836,7 +836,7 @@ describe("TeePool", () => {
       const proof3Info = await dataRegistry.fileProofs(4, 1);
       proof3Info.signature.should.eq(proofs[3].signature);
       proof3Info.data.score.should.eq(proofs[3].data.score);
-      proof3Info.data.timestamp.should.eq(proofs[3].data.timestamp);
+      proof3Info.data.dlpId.should.eq(proofs[3].data.dlpId);
       proof3Info.data.metadata.should.eq(proofs[3].data.metadata);
       proof3Info.data.proofUrl.should.eq(proofs[3].data.proofUrl);
       proof3Info.data.instruction.should.eq(proofs[3].data.instruction);

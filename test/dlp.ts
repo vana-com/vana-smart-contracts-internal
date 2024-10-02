@@ -8,13 +8,6 @@ import {
   TeePoolImplementation,
 } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import {
-  advanceBlockNTimes,
-  advanceNSeconds,
-  advanceToBlockN,
-  getCurrentBlockNumber,
-  getCurrentBlockTimestamp,
-} from "../utils/timeAndBlockManipulation";
 import { deployDataRegistry, Proof, proofs, signProof } from "./dataRegistry";
 import { parseEther } from "../utils/helpers";
 

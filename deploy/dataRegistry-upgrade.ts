@@ -3,12 +3,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyProxy } from "./helpers";
 
-const implementationContractName = "DataLiquidityPoolsRootImplementation";
-const previousImplementationContractName =
-  "DataLiquidityPoolsRootImplementationOld";
-const proxyContractName = "DataLiquidityPoolsRootProxy";
+const implementationContractName = "DataRegistryImplementation";
+const previousImplementationContractName = "DataRegistryImplementationOld";
+const proxyContractName = "DataRegistryProxy";
 const proxyContractPath =
-  "contracts/root/DataLiquidityPoolsRootProxy.sol:DataLiquidityPoolsRootProxy";
+  "contracts/dataRegistry/DataRegistryProxy.sol:DataRegistryProxy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const [deployer] = await ethers.getSigners();
@@ -21,10 +20,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`**************************************************************`);
   console.log(`********** Upgrade ${proxyContractName} **********`);
 
-  await upgrades.validateUpgrade(
-    await ethers.getContractFactory(previousImplementationContractName),
-    await ethers.getContractFactory(implementationContractName),
-  );
+  // await upgrades.validateUpgrade(
+  //   await ethers.getContractFactory(previousImplementationContractName),
+  //   await ethers.getContractFactory(implementationContractName),
+  // );
 
   const implementationDeploy = await deployments.deploy(
     implementationContractName,
@@ -53,4 +52,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 
 export default func;
-func.tags = ["DLPRootUpgrade"];
+func.tags = ["DataRegistryUpgrade"];

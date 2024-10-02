@@ -28,7 +28,7 @@ export async function deployDataRegistry(
 
 export type ProofData = {
   score: bigint;
-  timestamp: number;
+  dlpId: number;
   metadata: string;
   proofUrl: string;
   instruction: string;
@@ -44,7 +44,7 @@ const proof0: Proof = {
     "0x00000000000bdcaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
   data: {
     score: parseEther(0),
-    timestamp: 0,
+    dlpId: 0,
     metadata: "",
     proofUrl: "",
     instruction: "",
@@ -56,7 +56,7 @@ const proof1: Proof = {
     "0x5347f83fe352b10144e7c6eaca13e682be88e6d72da3c2c12996e5bbdda1122e756d727d97a32279d4cdd236c05ce040440cdd9304ca3bd3941d212354d8a4e41c",
   data: {
     score: parseEther(0.1),
-    timestamp: 12345678912,
+    dlpId: 1,
     metadata: "metadata1",
     proofUrl:
       "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll1",
@@ -70,7 +70,7 @@ const proof2: Proof = {
     "0x1f7c76080bebdcaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
   data: {
     score: parseEther(0.3),
-    timestamp: 1234654321,
+    dlpId: 2,
     metadata: "metadata2",
     proofUrl:
       "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll2",
@@ -84,7 +84,7 @@ const proof3: Proof = {
     "0x3453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
   data: {
     score: parseEther(0.5),
-    timestamp: 12340202022,
+    dlpId: 3,
     metadata: "metadata3",
     proofUrl:
       "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll3",
@@ -98,7 +98,7 @@ const proof4: Proof = {
     "0x4453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
   data: {
     score: parseEther(0.7),
-    timestamp: 123402020444,
+    dlpId: 4,
     metadata: "metadata4",
     proofUrl:
       "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll4",
@@ -112,7 +112,7 @@ const proof5: Proof = {
     "0x5453567892f7ccaa8fe6748edfcb04d5ab59a75123fc06f10f1f82dcc50bd8365677d868ef40572529760d0f093c73d781053d9a6a597e0c169e58b2685f74161c",
   data: {
     score: parseEther(0.9),
-    timestamp: 12340202111,
+    dlpId: 5,
     metadata: "metadata5",
     proofUrl:
       "https://ipfs.io/ipfs/bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7ll5",
@@ -133,7 +133,7 @@ export async function signProof(
     [
       fileUrl,
       proofData.score,
-      proofData.timestamp,
+      proofData.dlpId,
       proofData.metadata,
       proofData.proofUrl,
       proofData.instruction,
@@ -421,7 +421,7 @@ describe("DataRegistry", () => {
       const file1Proof1 = await dataRegistry.fileProofs(1, 1);
       file1Proof1.signature.should.eq(proof1.signature);
       file1Proof1.data.score.should.eq(proof1.data.score);
-      file1Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file1Proof1.data.dlpId.should.eq(proof1.data.dlpId);
       file1Proof1.data.metadata.should.eq(proof1.data.metadata);
       file1Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
       file1Proof1.data.instruction.should.eq(proof1.data.instruction);
@@ -445,7 +445,7 @@ describe("DataRegistry", () => {
       const file1Proof1 = await dataRegistry.fileProofs(1, 1);
       file1Proof1.signature.should.eq(proof1.signature);
       file1Proof1.data.score.should.eq(proof1.data.score);
-      file1Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file1Proof1.data.dlpId.should.eq(proof1.data.dlpId);
       file1Proof1.data.metadata.should.eq(proof1.data.metadata);
       file1Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
       file1Proof1.data.instruction.should.eq(proof1.data.instruction);
@@ -453,7 +453,7 @@ describe("DataRegistry", () => {
       const file1Proof2 = await dataRegistry.fileProofs(1, 2);
       file1Proof2.signature.should.eq(proof2.signature);
       file1Proof2.data.score.should.eq(proof2.data.score);
-      file1Proof2.data.timestamp.should.eq(proof2.data.timestamp);
+      file1Proof2.data.dlpId.should.eq(proof2.data.dlpId);
       file1Proof2.data.metadata.should.eq(proof2.data.metadata);
       file1Proof2.data.proofUrl.should.eq(proof2.data.proofUrl);
       file1Proof2.data.instruction.should.eq(proof2.data.instruction);
@@ -478,7 +478,7 @@ describe("DataRegistry", () => {
       const file1Proof1 = await dataRegistry.fileProofs(1, 1);
       file1Proof1.signature.should.eq("0x");
       file1Proof1.data.score.should.eq(0);
-      file1Proof1.data.timestamp.should.eq(0);
+      file1Proof1.data.dlpId.should.eq(0);
       file1Proof1.data.metadata.should.eq("");
       file1Proof1.data.proofUrl.should.eq("");
       file1Proof1.data.instruction.should.eq("");
@@ -486,7 +486,7 @@ describe("DataRegistry", () => {
       const file2Proof1 = await dataRegistry.fileProofs(2, 1);
       file2Proof1.signature.should.eq(proof1.signature);
       file2Proof1.data.score.should.eq(proof1.data.score);
-      file2Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file2Proof1.data.dlpId.should.eq(proof1.data.dlpId);
       file2Proof1.data.metadata.should.eq(proof1.data.metadata);
       file2Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
       file2Proof1.data.instruction.should.eq(proof1.data.instruction);
@@ -494,7 +494,7 @@ describe("DataRegistry", () => {
       const file3Proof1 = await dataRegistry.fileProofs(3, 1);
       file3Proof1.signature.should.eq(proof2.signature);
       file3Proof1.data.score.should.eq(proof2.data.score);
-      file3Proof1.data.timestamp.should.eq(proof2.data.timestamp);
+      file3Proof1.data.dlpId.should.eq(proof2.data.dlpId);
       file3Proof1.data.metadata.should.eq(proof2.data.metadata);
       file3Proof1.data.proofUrl.should.eq(proof2.data.proofUrl);
       file3Proof1.data.instruction.should.eq(proof2.data.instruction);
@@ -517,7 +517,7 @@ describe("DataRegistry", () => {
       const file1Proof1 = await dataRegistry.fileProofs(1, 1);
       file1Proof1.signature.should.eq("0x");
       file1Proof1.data.score.should.eq(0);
-      file1Proof1.data.timestamp.should.eq(0);
+      file1Proof1.data.dlpId.should.eq(0);
       file1Proof1.data.metadata.should.eq("");
       file1Proof1.data.proofUrl.should.eq("");
       file1Proof1.data.instruction.should.eq("");
@@ -525,7 +525,7 @@ describe("DataRegistry", () => {
       const file2Proof1 = await dataRegistry.fileProofs(2, 1);
       file2Proof1.signature.should.eq(proof1.signature);
       file2Proof1.data.score.should.eq(proof1.data.score);
-      file2Proof1.data.timestamp.should.eq(proof1.data.timestamp);
+      file2Proof1.data.dlpId.should.eq(proof1.data.dlpId);
       file2Proof1.data.metadata.should.eq(proof1.data.metadata);
       file2Proof1.data.proofUrl.should.eq(proof1.data.proofUrl);
       file2Proof1.data.instruction.should.eq(proof1.data.instruction);
@@ -533,7 +533,7 @@ describe("DataRegistry", () => {
       const file3Proof1 = await dataRegistry.fileProofs(3, 1);
       file3Proof1.signature.should.eq(proof2.signature);
       file3Proof1.data.score.should.eq(proof2.data.score);
-      file3Proof1.data.timestamp.should.eq(proof2.data.timestamp);
+      file3Proof1.data.dlpId.should.eq(proof2.data.dlpId);
       file3Proof1.data.metadata.should.eq(proof2.data.metadata);
       file3Proof1.data.proofUrl.should.eq(proof2.data.proofUrl);
       file3Proof1.data.instruction.should.eq(proof2.data.instruction);
@@ -541,7 +541,7 @@ describe("DataRegistry", () => {
       const file3Proof2 = await dataRegistry.fileProofs(3, 2);
       file3Proof2.signature.should.eq(proof3.signature);
       file3Proof2.data.score.should.eq(proof3.data.score);
-      file3Proof2.data.timestamp.should.eq(proof3.data.timestamp);
+      file3Proof2.data.dlpId.should.eq(proof3.data.dlpId);
       file3Proof2.data.metadata.should.eq(proof3.data.metadata);
       file3Proof2.data.proofUrl.should.eq(proof3.data.proofUrl);
       file3Proof2.data.instruction.should.eq(proof3.data.instruction);
@@ -549,7 +549,7 @@ describe("DataRegistry", () => {
       const file3Proof3 = await dataRegistry.fileProofs(3, 3);
       file3Proof3.signature.should.eq(proof4.signature);
       file3Proof3.data.score.should.eq(proof4.data.score);
-      file3Proof3.data.timestamp.should.eq(proof4.data.timestamp);
+      file3Proof3.data.dlpId.should.eq(proof4.data.dlpId);
       file3Proof3.data.metadata.should.eq(proof4.data.metadata);
       file3Proof3.data.proofUrl.should.eq(proof4.data.proofUrl);
       file3Proof3.data.instruction.should.eq(proof4.data.instruction);
@@ -557,7 +557,7 @@ describe("DataRegistry", () => {
       const file6Proof1 = await dataRegistry.fileProofs(6, 1);
       file6Proof1.signature.should.eq(proof5.signature);
       file6Proof1.data.score.should.eq(proof5.data.score);
-      file6Proof1.data.timestamp.should.eq(proof5.data.timestamp);
+      file6Proof1.data.dlpId.should.eq(proof5.data.dlpId);
       file6Proof1.data.metadata.should.eq(proof5.data.metadata);
       file6Proof1.data.proofUrl.should.eq(proof5.data.proofUrl);
       file6Proof1.data.instruction.should.eq(proof5.data.instruction);

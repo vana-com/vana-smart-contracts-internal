@@ -10,8 +10,6 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/DataLiquidityPoolsRootStorageV1.sol";
 
-import "hardhat/console.sol";
-
 contract DataLiquidityPoolsRootImplementation is
     UUPSUpgradeable,
     PausableUpgradeable,
@@ -452,15 +450,59 @@ contract DataLiquidityPoolsRootImplementation is
             totalRewardAmount += epochDlp.stakeAmount > 0
                 ? (((stakeAmount * epochDlp.rewardAmount) / epochDlp.stakeAmount) * epochDlp.stakersPercentage) / 100e18
                 : 0;
-
-            console.log(stakeAmount);
-            console.log(epochDlp.rewardAmount);
-            console.log(epochDlp.stakersPercentage);
-            console.log(epochDlp.stakeAmount);
-            console.log(totalRewardAmount);
         }
 
         return totalRewardAmount;
+    }
+
+    /**
+     * @notice Gets the estimated rewards for dlp's stakes
+     * @notice This contract returns a percentages, scaled by 1e18
+     *
+     * @param dlpId                         id of the dlp
+     * @return historyRewardEstimation      percentage estimated reward per epoch based on
+     *                                      the data from the last epoch in which the dlp was part of
+     * @return stakeRewardEstimation        percentage estimated reward per epoch based on
+     *                                      the total stake amount and reward from the current epoch
+     * @dev if the historyRewardEstimation > 0, stakeRewardEstimation might be irrelevant
+     * @dev percentage is
+     */
+    function estimatedDlpReward(
+        uint256 dlpId
+    ) external view returns (uint256 historyRewardEstimation, uint256 stakeRewardEstimation) {
+        uint256 lastEpochId = epochsCount > 11 ? epochsCount - 10 : 1;
+
+        historyRewardEstimation = 0;
+        //estimated reward based on the data from the last epoch in which the dlp was part of
+        for (uint256 i = epochsCount - 1; i >= lastEpochId; i--) {
+            Epoch storage epoch = _epochs[i];
+
+            if (!epoch.isFinalised) {
+                continue;
+            }
+
+            EpochDlp storage epochDlp = epoch.dlps[dlpId];
+            if (epochDlp.stakeAmount == 0) {
+                continue;
+            }
+
+            historyRewardEstimation = (epochDlp.rewardAmount * epochDlp.stakersPercentage) / epochDlp.stakeAmount;
+        }
+
+        //estimated reward based on the total stake amount and reward from the current epoch
+        Epoch storage epoch = _epochs[epochsCount];
+        Dlp storage dlp = _dlps[dlpId];
+
+        uint256 totalStaked = 0;
+
+        for (uint256 index = 0; index < epoch.dlpIds.length(); index++) {
+            totalStaked += epoch.dlps[epoch.dlpIds.at(index)].stakeAmount;
+        }
+
+        uint256 dlpStakeAmount = _dlpComputedStakeAmount(dlpId);
+
+        uint256 dlpReward = (epoch.rewardAmount * dlpStakeAmount) / totalStaked;
+        stakeRewardEstimation = (dlpReward * dlp.stakersPercentage) / dlpStakeAmount;
     }
 
     /**
@@ -901,14 +943,9 @@ contract DataLiquidityPoolsRootImplementation is
 
         staker.dlpIds.add(dlpId);
 
-        console.log("_stake---------------------------------");
-        console.log("dlpId: ", dlpId);
-        console.log("_stake before: ", dlp.stakeAmountCheckpoints.latest());
-
         _checkpointPush(dlp.stakeAmountCheckpoints, amount);
         (uint224 pos, ) = _checkpointPush(dlp.stakers[stakerAddress].stakeAmountCheckpoints, amount);
 
-        console.log("_stake after: ", dlp.stakeAmountCheckpoints.latest());
         DlpStaker storage dlpStaker = dlp.stakers[stakerAddress];
 
         if (pos == 0) {
@@ -923,12 +960,6 @@ contract DataLiquidityPoolsRootImplementation is
      */
     function _unstake(address stakerAddress, uint256 dlpId, uint256 amount) internal {
         Dlp storage dlp = _dlps[dlpId];
-
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
-        console.log("_unstake_unstake_unstake_unstake");
 
         _checkpointPush(dlp.unstakeAmountCheckpoints, amount);
         _checkpointPush(dlp.stakers[stakerAddress].unstakeAmountCheckpoints, amount);
@@ -1067,19 +1098,6 @@ contract DataLiquidityPoolsRootImplementation is
     }
 
     function _dlpComputedStakeAmountByBlock(uint256 dlpId, uint48 checkBlock) internal view returns (uint256) {
-        console.log("_dlpComputedStakeAmountByBlock");
-        console.log("dlpId: ", dlpId);
-        console.log("checkBlock: ", checkBlock);
-        console.log(
-            "_dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock): ",
-            _dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock)
-        );
-        console.log(
-            "_dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock): ",
-            _dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock)
-        );
-        console.log("_dlps[dlpId].stakeAmountCheckpoints.latest(): ", _dlps[dlpId].stakeAmountCheckpoints.latest());
-
         return
             _dlps[dlpId].stakeAmountCheckpoints.upperLookup(checkBlock) -
             _dlps[dlpId].unstakeAmountCheckpoints.upperLookup(checkBlock);
@@ -1103,8 +1121,6 @@ contract DataLiquidityPoolsRootImplementation is
 
         uint256[] memory topDlps = topDlpIds(numberOfTopDlps);
 
-        console.log("--------------------");
-
         while (lastEpoch.endBlock < blockNumber) {
             epochsCount++;
 
@@ -1114,21 +1130,14 @@ contract DataLiquidityPoolsRootImplementation is
             newEpoch.endBlock = newEpoch.startBlock + epochSize - 1;
             newEpoch.rewardAmount = epochRewardAmount;
 
-            console.log("epochsCount: ", epochsCount);
-
             uint256 index;
             for (index = 0; index < topDlps.length; index++) {
                 newEpoch.dlpIds.add(topDlps[index]);
-                console.log("*******");
-                console.log("index: ", index);
-                console.log("topDlps[index]: ", topDlps[index]);
 
                 newEpoch.dlps[topDlps[index]].stakeAmount = _dlpComputedStakeAmountByBlock(
                     topDlps[index],
                     SafeCast.toUint48(lastEpoch.endBlock)
                 );
-
-                console.log("newEpoch.dlps[topDlps[index]].stakeAmount: ", newEpoch.dlps[topDlps[index]].stakeAmount);
 
                 newEpoch.dlps[topDlps[index]].stakersPercentage = _dlps[topDlps[index]].stakersPercentage;
             }

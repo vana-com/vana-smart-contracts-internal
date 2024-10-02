@@ -224,7 +224,7 @@ contract DataLiquidityPoolImplementation is
             abi.encodePacked(
                 registryFile.url,
                 fileProof.data.score,
-                fileProof.data.timestamp,
+                fileProof.data.dlpId,
                 fileProof.data.metadata,
                 fileProof.data.proofUrl,
                 fileProof.data.instruction
@@ -304,23 +304,5 @@ contract DataLiquidityPoolImplementation is
         file.status = FileStatus.Rejected;
 
         emit FileInvalidated(fileId);
-    }
-
-    function testSignature(uint256 fileId, uint256 proofIndex) external view returns (address) {
-        IDataRegistry.Proof memory fileProof = dataRegistry.fileProofs(fileId, proofIndex);
-
-        bytes32 _messageHash = keccak256(
-            abi.encodePacked(
-                fileProof.data.score,
-                fileProof.data.timestamp,
-                fileProof.data.metadata,
-                fileProof.data.proofUrl,
-                fileProof.data.instruction
-            )
-        );
-
-        address signer = _messageHash.toEthSignedMessageHash().recover(fileProof.signature);
-
-        return signer;
     }
 }
