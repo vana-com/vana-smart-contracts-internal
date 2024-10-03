@@ -41,7 +41,7 @@ chai.Assertion.addMethod(
 
     this.assert(
       actualArgs.length === expectedArgs.length &&
-        actualArgs.every((actual, index) => {
+        actualArgs.every((actual: any, index) => {
           const expected = expectedArgs[index];
           if (toleranceIndices.includes(index)) {
             const actualBigInt = BigInt(actual.toString());
@@ -223,19 +223,6 @@ describe("DataLiquidityPoolsRoot", () => {
     const topKIndexes = indexedArr.slice(0, k).map((tuple) => tuple[1] + 1);
 
     return topKIndexes;
-  }
-
-  function getTopKStakes0(arr: bigint[], k: number): BigInt[] {
-    // Create an array of objects with value and original index
-    const indexedArray = arr.map((value, index) => ({ value, index }));
-
-    // Sort the array by value in descending order
-    indexedArray.sort((a, b) => b.value - a.value);
-
-    // Slice the first k elements
-    const largestKElements = indexedArray.slice(0, k);
-
-    return largestKElements.map((element) => BigInt(element.index + 1));
   }
 
   describe("Setup", () => {
@@ -5035,6 +5022,7 @@ describe("DataLiquidityPoolsRoot", () => {
           dlp2OwnerDlp2Epoch2Reward +
           dlp2OwnerDlp2Epoch3Reward,
       );
+      // @ts-ignore
       (await root.claimableAmount(dlp3Owner, 3)).should.to.be.almostEq(
         dlp3OwnerDlp3Epoch1Reward +
           dlp3OwnerDlp3Epoch2Reward +
@@ -5112,6 +5100,8 @@ describe("DataLiquidityPoolsRoot", () => {
           dlp2OwnerDlp2Epoch3Reward +
           dlp2OwnerDlp2Epoch4Reward,
       );
+
+      // @ts-ignore
       (await root.claimableAmount(dlp3Owner, 3)).should.almostEq(
         dlp3OwnerDlp3Epoch1Reward +
           dlp3OwnerDlp3Epoch2Reward +
@@ -5131,6 +5121,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.claimableAmount(user2, 2)).should.eq(
         user2Dlp2Epoch2Reward + user2Dlp2Epoch3Reward + user2Dlp2Epoch4Reward,
       );
+      // @ts-ignore
       (await root.claimableAmount(user3, 3)).should.almostEq(
         user3Dlp3Epoch2Reward + user3Dlp3Epoch3Reward + user3Dlp3Epoch4Reward,
       );
@@ -5263,6 +5254,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.stakerDlpEpochs(dlp3Owner, 3, 2)).claimAmount.should.eq(
         dlp3OwnerDlp3Epoch2Reward,
       );
+      // @ts-ignore
       (await root.stakerDlpEpochs(dlp3Owner, 3, 3)).claimAmount.should.almostEq(
         dlp3OwnerDlp3Epoch3Reward,
       );
@@ -5299,6 +5291,7 @@ describe("DataLiquidityPoolsRoot", () => {
       (await root.stakerDlpEpochs(user3, 3, 3)).claimAmount.should.eq(
         user3Dlp3Epoch3Reward,
       );
+      // @ts-ignore
       (await root.stakerDlpEpochs(user3, 3, 4)).claimAmount.should.almostEq(
         user3Dlp3Epoch4Reward,
       );
@@ -5350,6 +5343,7 @@ describe("DataLiquidityPoolsRoot", () => {
           (await getReceipt(tx2)).fee,
       );
 
+      // @ts-ignore
       (await ethers.provider.getBalance(dlp3Owner)).should.almostEq(
         dlp3OwnerBalanceBefore +
           dlp3OwnerDlp3Epoch1Reward +
@@ -5386,6 +5380,7 @@ describe("DataLiquidityPoolsRoot", () => {
           (await getReceipt(tx7)).fee,
       );
 
+      // @ts-ignore
       (await ethers.provider.getBalance(user3)).should.almostEq(
         user3BalanceBefore +
           user3Dlp3Epoch2Reward +

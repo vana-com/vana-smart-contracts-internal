@@ -288,6 +288,8 @@ contract DataLiquidityPoolImplementation is
         file.rewardWithdrawn = file.rewardAmount;
         token.safeTransfer(registryFile.ownerAddress, file.rewardAmount);
 
+        totalContributorsRewardAmount -= file.rewardAmount;
+
         emit FileValidated(fileId);
     }
 

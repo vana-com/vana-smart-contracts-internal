@@ -155,10 +155,10 @@ xdescribe("DepositL1", () => {
       "0x1111111111111111111111111111111111111111",
     );
 
-    await depositProxy.setImplementation(
-      "0x1111111111111111111111111111111111111111",
-      "0x",
-    );
+    // await depositProxy.setImplementation(
+    //   "0x1111111111111111111111111111111111111111",
+    //   "0x",
+    // );
 
     await deposit.initialize(
       owner.address,
