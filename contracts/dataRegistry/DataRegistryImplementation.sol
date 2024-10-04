@@ -133,9 +133,30 @@ contract DataRegistryImplementation is
      * @return uint256                          id of the file
      */
     function addFile(string memory url) external override whenNotPaused returns (uint256) {
-        _addFile(url);
+        return _addFile(url, msg.sender);
+    }
 
-        return filesCount;
+    /**
+     * @notice Adds a file to the registry with permissions
+     *
+     * @param url                               url of the file
+     * @param ownerAddress                      address of the owner
+     * @param permissions                       permissions for the file
+     * @return uint256                          id of the file
+     */
+    function addFileWithPermissions(
+        string memory url,
+        address ownerAddress,
+        Permission[] memory permissions
+    ) external returns (uint256) {
+        uint256 fileId = _addFile(url, ownerAddress);
+
+        for (uint256 i = 0; i < permissions.length; i++) {
+            _files[fileId].permissions[permissions[i].account] = permissions[i].key;
+            emit PermissionGranted(fileId, permissions[i].account);
+        }
+
+        return fileId;
     }
 
     /**
@@ -172,14 +193,17 @@ contract DataRegistryImplementation is
      * @notice Adds a file to the registry
      *
      * @param url                               url of the file
+     * @param ownerAddress                      address of the owner
      */
-    function _addFile(string memory url) internal {
+    function _addFile(string memory url, address ownerAddress) internal returns (uint256) {
         uint256 cachedFilesCount = ++filesCount;
 
-        _files[cachedFilesCount].ownerAddress = msg.sender;
+        _files[cachedFilesCount].ownerAddress = ownerAddress;
         _files[cachedFilesCount].url = url;
         _files[cachedFilesCount].addedAtBlock = block.number;
 
-        emit FileAdded(cachedFilesCount, msg.sender, url);
+        emit FileAdded(cachedFilesCount, ownerAddress, url);
+
+        return filesCount;
     }
 }

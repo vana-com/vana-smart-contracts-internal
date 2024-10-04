@@ -487,6 +487,7 @@ contract DataLiquidityPoolsRootImplementation is
             }
 
             historyRewardEstimation = (epochDlp.rewardAmount * epochDlp.stakersPercentage) / epochDlp.stakeAmount;
+            break;
         }
 
         //estimated reward based on the total stake amount and reward from the current epoch

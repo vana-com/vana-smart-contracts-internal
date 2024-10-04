@@ -15,13 +15,6 @@ chai.use(chaiAsPromised);
 should();
 
 describe("DataLiquidityPool", () => {
-  enum ValidatorStatus {
-    None,
-    Registered,
-    Active,
-    Deregistered,
-  }
-
   let deployer: HardhatEthersSigner;
   let owner: HardhatEthersSigner;
   let user1: HardhatEthersSigner;
@@ -30,6 +23,7 @@ describe("DataLiquidityPool", () => {
   let user4: HardhatEthersSigner;
   let user5: HardhatEthersSigner;
   let tee1: HardhatEthersSigner;
+  let sponsor: HardhatEthersSigner;
 
   let dlp: DataLiquidityPoolImplementation;
   let dat: DAT;
@@ -44,10 +38,13 @@ describe("DataLiquidityPool", () => {
 
   const dlpInitialBalance = parseEther("1000000");
   const user1InitialBalance = parseEther("1000000");
-  const ownerInitialBalance = parseEther("1000000");
+  const ownerInitialBalance = parseEther("10000000");
+
+  const proofInstruction =
+    "https://ipfs.io/ipfs/qf34f34q4fq3fgdsgjgbdugsgwegqlgqhfejrfqjfwjfeql3u4iq4u47ll1";
 
   const deploy = async () => {
-    [deployer, owner, user1, user2, user3, user4, user5, tee1] =
+    [deployer, owner, user1, user2, user3, user4, user5, tee1, sponsor] =
       await ethers.getSigners();
 
     const datDeploy = await ethers.deployContract("DAT", [
@@ -84,6 +81,7 @@ describe("DataLiquidityPool", () => {
           teePoolAddress: teePool.target,
           name: dlpName,
           masterKey: "masterKey",
+          proofInstruction: proofInstruction,
           fileRewardFactor: fileRewardFactor,
         },
       ],
@@ -97,7 +95,6 @@ describe("DataLiquidityPool", () => {
       dlpDeploy.target,
     );
 
-    await dat.connect(owner).mint(dlp, dlpInitialBalance);
     await dat.connect(owner).mint(user1, user1InitialBalance);
     await dat.connect(owner).mint(owner, ownerInitialBalance);
   };
@@ -195,6 +192,44 @@ describe("DataLiquidityPool", () => {
         );
 
       (await dlp.fileRewardFactor()).should.eq(fileRewardFactor);
+    });
+
+    it("Should updateMasterKey when owner", async function () {
+      await dlp
+        .connect(owner)
+        .updateMasterKey("newMasterKey")
+        .should.emit(dlp, "MasterKeyUpdated")
+        .withArgs("newMasterKey");
+
+      (await dlp.masterKey()).should.eq("newMasterKey");
+    });
+
+    it("Should reject updateMasterKey when non-owner", async function () {
+      await dlp
+        .connect(user1)
+        .updateMasterKey("newMasterKey")
+        .should.be.rejectedWith(
+          `OwnableUnauthorizedAccount("${user1.address}")`,
+        );
+    });
+
+    it("Should updateProofInstruction when owner", async function () {
+      await dlp
+        .connect(owner)
+        .updateProofInstruction("newProofInstruction")
+        .should.emit(dlp, "ProofInstructionUpdated")
+        .withArgs("newProofInstruction");
+
+      (await dlp.proofInstruction()).should.eq("newProofInstruction");
+    });
+
+    it("Should reject updateProofInstruction when non-owner", async function () {
+      await dlp
+        .connect(user1)
+        .updateProofInstruction("newProofInstruction")
+        .should.be.rejectedWith(
+          `OwnableUnauthorizedAccount("${user1.address}")`,
+        );
     });
 
     it("Should transferOwnership in 2 steps", async function () {
@@ -303,13 +338,20 @@ describe("DataLiquidityPool", () => {
     });
   });
 
-  describe("Files", () => {
+  describe("RequestProof", () => {
     beforeEach(async () => {
       await deploy();
+
+      await dat.connect(owner).approve(dlp.target, dlpInitialBalance);
+      await dlp.connect(owner).addRewardsForContributors(dlpInitialBalance);
     });
 
-    it("should addFile", async function () {
-      await dataRegistry.connect(user1).addFile("file1Url");
+    it("should requestReward #1", async function () {
+      await dataRegistry
+        .connect(sponsor)
+        .addFileWithPermissions("file1Url", user1, []);
+
+      await teePool.connect(sponsor).submitJob(1, { value: parseEther(0.01) });
 
       const proof1: Proof = {
         signature: await signProof(tee1, "file1Url", proofs[1].data),
@@ -319,111 +361,97 @@ describe("DataLiquidityPool", () => {
       await dataRegistry.connect(tee1).addProof(1, proof1);
 
       await dlp
-        .connect(user1)
-        .addFile(1, 1)
-        .should.emit(dlp, "FileAdded")
-        .withArgs(user1, 1);
+        .connect(sponsor)
+        .requestReward(1, 1)
+        .should.emit(dlp, "RewardRequested")
+        .withArgs(
+          user1,
+          1,
+          1,
+          (proofs[1].data.score * fileRewardFactor) / parseEther("1"),
+        );
 
-      (await dlp.filesCount()).should.eq(1);
+      (await dlp.filesListCount()).should.eq(1);
 
       const file1 = await dlp.files(1);
-      file1.registryId.should.eq(1);
       file1.proofIndex.should.eq(1);
       file1.rewardAmount.should.eq(
         (proofs[1].data.score * fileRewardFactor) / parseEther("1"),
       );
-      file1.rewardWithdrawn.should.eq(0);
 
-      (await dlp.contributorFiles(user1, 1)).should.deep.eq(file1);
+      (await dlp.contributorFiles(user1, 0)).should.deep.eq(file1);
 
       (await dlp.contributorsCount()).should.eq(1);
       const contributor1 = await dlp.contributors(1);
       contributor1.contributorAddress.should.eq(user1);
-      contributor1.fileIdsCount.should.eq(1);
+      contributor1.filesListCount.should.eq(1);
 
       (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
     });
 
-    it("should addFile multiple times by same user", async function () {
-      await dataRegistry.connect(user1).addFile("file1Url");
+    it("should requestReward #2", async function () {
+      await dataRegistry
+        .connect(sponsor)
+        .addFileWithPermissions("file2Url", user2, []);
+
+      await dataRegistry
+        .connect(sponsor)
+        .addFileWithPermissions("file3Url", user2, []);
+
+      await dataRegistry
+        .connect(sponsor)
+        .addFileWithPermissions("file1Url", user1, []);
+
+      await teePool.connect(sponsor).submitJob(3, { value: parseEther(0.01) });
 
       const proof1: Proof = {
-        signature: await signProof(tee1, "file1Url", proofs[1].data),
-        data: proofs[1].data,
-      };
-      await dataRegistry.connect(user1).addProof(1, proof1);
-
-      await dataRegistry.connect(user1).addFile("file2Url");
-
-      const proof2: Proof = {
-        signature: await signProof(tee1, "file2Url", proofs[2].data),
+        signature: await signProof(tee1, "file1Url", proofs[2].data),
         data: proofs[2].data,
       };
-      await dataRegistry.connect(tee1).addProof(2, proof2);
 
-      await dlp
-        .connect(user1)
-        .addFile(1, 1)
-        .should.emit(dlp, "FileAdded")
-        .withArgs(user1, 1);
-      await dlp
-        .connect(user1)
-        .addFile(2, 1)
-        .should.emit(dlp, "FileAdded")
-        .withArgs(user1, 2);
-
-      (await dlp.filesCount()).should.eq(2);
-
-      const file1 = await dlp.files(1);
-      file1.registryId.should.eq(1);
-      file1.proofIndex.should.eq(1);
-      file1.rewardAmount.should.eq(
-        (proofs[1].data.score * fileRewardFactor) / parseEther("1"),
-      );
-      file1.rewardWithdrawn.should.eq(0);
-      (await dlp.contributorFiles(user1, 1)).should.deep.eq(file1);
-
-      const file2 = await dlp.files(2);
-      file2.registryId.should.eq(2);
-      file2.proofIndex.should.eq(1);
-      file2.rewardAmount.should.eq(
-        (proofs[2].data.score * fileRewardFactor) / parseEther("1"),
-      );
-      file2.rewardWithdrawn.should.eq(0);
-      (await dlp.contributorFiles(user1, 2)).should.deep.eq(file2);
-
-      (await dlp.contributorsCount()).should.eq(1);
-      const contributor1 = await dlp.contributors(1);
-      contributor1.contributorAddress.should.eq(user1);
-      contributor1.fileIdsCount.should.eq(2);
-
-      (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
-    });
-  });
-  describe("File validation", () => {
-    beforeEach(async () => {
-      await deploy();
-
-      await dat.connect(owner).approve(dlp.target, parseEther(1000));
-      await dlp.connect(owner).addRewardsForContributors(parseEther(1000));
-    });
-
-    it("should validateFile when owner", async function () {
-      await dataRegistry.connect(user1).addFile("file1Url");
-
-      const proof1: Proof = {
+      const proof2: Proof = {
         signature: await signProof(tee1, "file1Url", proofs[1].data),
         data: proofs[1].data,
       };
 
-      await dataRegistry.connect(user1).addProof(1, proof1);
+      await dataRegistry.connect(tee1).addProof(3, proof1);
+      await dataRegistry.connect(tee1).addProof(3, proof2);
 
-      await dlp.connect(user1).addFile(1, 1);
       await dlp
-        .connect(owner)
-        .validateFile(1)
-        .should.emit(dlp, "FileValidated")
-        .withArgs(1);
+        .connect(sponsor)
+        .requestReward(3, 2)
+        .should.emit(dlp, "RewardRequested")
+        .withArgs(
+          user1,
+          3,
+          2,
+          (proofs[1].data.score * fileRewardFactor) / parseEther("1"),
+        );
+
+      (await dlp.filesListCount()).should.eq(1);
+
+      const file1 = await dlp.files(3);
+      file1.fileId.should.eq(3);
+      file1.proofIndex.should.eq(2);
+      file1.rewardAmount.should.eq(
+        (proofs[1].data.score * fileRewardFactor) / parseEther("1"),
+      );
+
+      (await dlp.contributorFiles(user1, 0)).should.deep.eq(file1);
+
+      (await dlp.contributorsCount()).should.eq(1);
+      const contributor1 = await dlp.contributors(1);
+      contributor1.contributorAddress.should.eq(user1);
+      contributor1.filesListCount.should.eq(1);
+
+      (await dlp.contributorInfo(user1)).should.deep.eq(contributor1);
+
+      (await dat.balanceOf(dlp)).should.eq(
+        dlpInitialBalance - file1.rewardAmount,
+      );
+      (await dat.balanceOf(user1)).should.eq(
+        user1InitialBalance + file1.rewardAmount,
+      );
     });
   });
 });

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 interface IDataRegistry {
     struct ProofData {
         uint256 score;
-        uint256 timestamp;
+        uint256 dlpId;
         string metadata;
         string proofUrl;
         string instruction;

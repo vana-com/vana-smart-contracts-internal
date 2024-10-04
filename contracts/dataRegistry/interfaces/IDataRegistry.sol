@@ -31,6 +31,11 @@ interface IDataRegistry {
         uint256 addedAtBlock;
     }
 
+    struct Permission {
+        address account;
+        string key;
+    }
+
     function version() external pure returns (uint256);
     function filesCount() external view returns (uint256);
     function files(uint256 index) external view returns (FileResponse memory);
@@ -39,6 +44,11 @@ interface IDataRegistry {
     function pause() external;
     function unpause() external;
     function addFile(string memory url) external returns (uint256);
+    function addFileWithPermissions(
+        string memory url,
+        address ownerAddress,
+        Permission[] memory permissions
+    ) external returns (uint256);
     function addProof(uint256 fileId, Proof memory proof) external;
     function addFilePermission(uint256 fileId, address account, string memory key) external;
 }

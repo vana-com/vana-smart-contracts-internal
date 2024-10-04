@@ -19,7 +19,6 @@ contract DataLiquidityPoolImplementation is
 {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableSet for EnumerableSet.Bytes32Set;
 
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
@@ -27,12 +26,20 @@ contract DataLiquidityPoolImplementation is
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Triggered when a file has been added
+     * @notice Triggered when a reward has been requested for a file
      *
      * @param contributorAddress                 owner of the file
-     * @param fileId                             file id
+     * @param fileId                             file id from the registryData contract
+     * @param proofIndex                         proof index
+     * @param proofIndex                         proof index
+     * @param rewardAmount                       reward amount
      */
-    event FileAdded(address indexed contributorAddress, uint256 fileId);
+    event RewardRequested(
+        address indexed contributorAddress,
+        uint256 indexed fileId,
+        uint256 indexed proofIndex,
+        uint256 rewardAmount
+    );
 
     /**
      * @notice Triggered when a file has been validated
@@ -55,12 +62,23 @@ contract DataLiquidityPoolImplementation is
      */
     event FileRewardFactorUpdated(uint256 newFileRewardFactor);
 
-    error WithdrawNotAllowed();
+    /**
+     * @notice Triggered when the proofInstruction has been updated
+     *
+     * @param newProofInstruction                new proof instruction
+     */
+    event ProofInstructionUpdated(string newProofInstruction);
+
+    /**
+     * @notice Triggered when the masterKey has been updated
+     *
+     * @param newMasterKey                new master key
+     */
+    event MasterKeyUpdated(string newMasterKey);
+
     error FileAlreadyAdded();
-    error InvalidFileStatus();
-    error NotAllowed();
     error InvalidAttestator();
-    error InvalidFileOwner();
+    error InvalidProof();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -74,6 +92,7 @@ contract DataLiquidityPoolImplementation is
         address teePoolAddress;
         string name;
         string masterKey;
+        string proofInstruction;
         uint256 fileRewardFactor;
     }
 
@@ -93,6 +112,7 @@ contract DataLiquidityPoolImplementation is
         token = IERC20(params.tokenAddress);
         teePool = ITeePool(params.teePoolAddress);
         masterKey = params.masterKey;
+        proofInstruction = params.proofInstruction;
         fileRewardFactor = params.fileRewardFactor;
 
         _transferOwnership(params.ownerAddress);
@@ -124,13 +144,26 @@ contract DataLiquidityPoolImplementation is
         return
             FileResponse({
                 fileId: fileId,
-                status: file.status,
-                registryId: file.registryId,
                 timestamp: file.timestamp,
                 proofIndex: file.proofIndex,
-                rewardAmount: file.rewardAmount,
-                rewardWithdrawn: file.rewardWithdrawn
+                rewardAmount: file.rewardAmount
             });
+    }
+
+    /**
+     * @notice Gets the files list count
+     */
+    function filesListCount() external view override returns (uint256) {
+        return _filesList.length();
+    }
+
+    /**
+     * @notice Gets the files list at index
+     *
+     * @param index                   index of the file
+     */
+    function filesListAt(uint256 index) external view override returns (uint256) {
+        return _filesList.at(index);
     }
 
     /**
@@ -153,7 +186,7 @@ contract DataLiquidityPoolImplementation is
         return
             ContributorInfoResponse({
                 contributorAddress: contributorAddress,
-                fileIdsCount: _contributorInfo[contributorAddress].fileIdsCount
+                filesListCount: _contributorInfo[contributorAddress].filesList.length()
             });
     }
 
@@ -168,7 +201,7 @@ contract DataLiquidityPoolImplementation is
         address contributorAddress,
         uint256 index
     ) external view override returns (FileResponse memory) {
-        return files(_contributorInfo[contributorAddress].fileIds[index]);
+        return files(_contributorInfo[contributorAddress].filesList.at(index));
     }
 
     /**
@@ -206,19 +239,47 @@ contract DataLiquidityPoolImplementation is
     }
 
     /**
-     * @notice Adds a file
+     * @notice Updates the proofInstruction
      *
-     * @param registryId                         file id from the registryData contract
+     * @param newProofInstruction                new proof instruction
+     */
+    function updateProofInstruction(string calldata newProofInstruction) external override onlyOwner {
+        proofInstruction = newProofInstruction;
+
+        emit ProofInstructionUpdated(newProofInstruction);
+    }
+
+    /**
+     * @notice Updates the masterKey
+     *
+     * @param newProofInstruction                new proof instruction
+     */
+    function updateMasterKey(string calldata newProofInstruction) external override onlyOwner {
+        masterKey = newProofInstruction;
+
+        emit MasterKeyUpdated(newProofInstruction);
+    }
+
+    /**
+     * @notice Requests a reward for a file
+     *
+     * @param fileId                             file id from the registryData contract
      * @param proofIndex                         proof index
      */
-    function addFile(uint256 registryId, uint256 proofIndex) external override whenNotPaused {
-        IDataRegistry.Proof memory fileProof = dataRegistry.fileProofs(registryId, proofIndex);
+    function requestReward(uint256 fileId, uint256 proofIndex) external override whenNotPaused nonReentrant {
+        IDataRegistry.Proof memory fileProof = dataRegistry.fileProofs(fileId, proofIndex);
 
-        IDataRegistry.FileResponse memory registryFile = dataRegistry.files(registryId);
-
-        if (registryFile.ownerAddress != msg.sender) {
-            revert InvalidFileOwner();
+        if (keccak256(bytes(fileProof.data.instruction)) != keccak256(bytes(proofInstruction))) {
+            revert InvalidProof();
         }
+
+        File storage file = _files[fileId];
+
+        if (file.rewardAmount != 0) {
+            revert FileAlreadyAdded();
+        }
+
+        IDataRegistry.FileResponse memory registryFile = dataRegistry.files(fileId);
 
         bytes32 _messageHash = keccak256(
             abi.encodePacked(
@@ -237,25 +298,25 @@ contract DataLiquidityPoolImplementation is
             revert InvalidAttestator();
         }
 
-        filesCount++;
-
-        File storage file = _files[filesCount];
-        file.registryId = registryId;
         file.timestamp = block.timestamp;
         file.proofIndex = proofIndex;
-        file.status = FileStatus.Added;
-        file.rewardAmount = (fileRewardFactor * dataRegistry.fileProofs(registryId, proofIndex).data.score) / 1e18;
+        file.rewardAmount = (fileRewardFactor * fileProof.data.score) / 1e18;
 
-        Contributor storage contributor = _contributorInfo[msg.sender];
-        contributor.fileIdsCount++;
-        contributor.fileIds[contributor.fileIdsCount] = filesCount;
+        _filesList.add(fileId);
 
-        if (contributor.fileIdsCount == 1) {
+        Contributor storage contributor = _contributorInfo[registryFile.ownerAddress];
+        contributor.filesList.add(fileId);
+
+        token.safeTransfer(registryFile.ownerAddress, file.rewardAmount);
+
+        totalContributorsRewardAmount -= file.rewardAmount;
+
+        if (contributor.filesList.length() == 1) {
             contributorsCount++;
-            _contributors[contributorsCount] = msg.sender;
+            _contributors[contributorsCount] = registryFile.ownerAddress;
         }
 
-        emit FileAdded(msg.sender, filesCount);
+        emit RewardRequested(registryFile.ownerAddress, fileId, proofIndex, file.rewardAmount);
     }
 
     /**
@@ -264,49 +325,5 @@ contract DataLiquidityPoolImplementation is
     function addRewardsForContributors(uint256 contributorsRewardAmount) external override nonReentrant {
         token.safeTransferFrom(msg.sender, address(this), contributorsRewardAmount);
         totalContributorsRewardAmount += contributorsRewardAmount;
-    }
-
-    /**
-     * @notice Validates a file and send the contribution reward
-     *
-     * @param fileId                             file id
-     */
-    function validateFile(uint256 fileId) external override onlyOwner {
-        File storage file = _files[fileId];
-
-        if (file.status != FileStatus.Added) {
-            revert InvalidFileStatus();
-        }
-
-        if (file.rewardWithdrawn > 0 || totalContributorsRewardAmount < file.rewardAmount) {
-            revert WithdrawNotAllowed();
-        }
-
-        IDataRegistry.FileResponse memory registryFile = dataRegistry.files(file.registryId);
-
-        file.status = FileStatus.Validated;
-        file.rewardWithdrawn = file.rewardAmount;
-        token.safeTransfer(registryFile.ownerAddress, file.rewardAmount);
-
-        totalContributorsRewardAmount -= file.rewardAmount;
-
-        emit FileValidated(fileId);
-    }
-
-    /**
-     * @notice Invalidates a file
-     *
-     * @param fileId                             file id
-     */
-    function invalidateFile(uint256 fileId) external override onlyOwner {
-        File storage file = _files[fileId];
-
-        if (file.status != FileStatus.Added) {
-            revert InvalidFileStatus();
-        }
-
-        file.status = FileStatus.Rejected;
-
-        emit FileInvalidated(fileId);
     }
 }
