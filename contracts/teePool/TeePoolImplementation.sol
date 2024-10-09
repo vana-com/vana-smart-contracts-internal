@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/TeePoolStorageV1.sol";
@@ -12,18 +13,21 @@ contract TeePoolImplementation is
     PausableUpgradeable,
     Ownable2StepUpgradeable,
     ReentrancyGuardUpgradeable,
+    MulticallUpgradeable,
     TeePoolStorageV1
 {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /**
      * @notice Triggered when a job has been submitted
      *
      * @param jobId                             id of the job
      * @param fileId                            id of the file
+     * @param teeAddress                        address of the tee
      * @param bidAmount                         bid amount
      */
-    event JobSubmitted(uint256 indexed jobId, uint256 indexed fileId, uint256 bidAmount);
+    event JobSubmitted(uint256 indexed jobId, uint256 indexed fileId, address teeAddress, uint256 bidAmount);
 
     /**
      * @notice Triggered when a job has been cancelled
@@ -67,6 +71,7 @@ contract TeePoolImplementation is
     error TeeNotActive();
     error JobCompleted();
     error InvalidJobStatus();
+    error InvalidJobTee();
     error NothingToClaim();
     error InsufficientFee();
     error NoActiveTee();
@@ -147,8 +152,40 @@ contract TeePoolImplementation is
                 url: _tees[teeAddress].url,
                 status: _tees[teeAddress].status,
                 amount: _tees[teeAddress].amount,
-                withdrawnAmount: _tees[teeAddress].withdrawnAmount
+                withdrawnAmount: _tees[teeAddress].withdrawnAmount,
+                jobsCount: _tees[teeAddress].jobIdsList.length()
             });
+    }
+
+    /**
+     * @notice Returns a paginated list of jobs for the given tee
+     *
+     * @param teeAddress                        address of the tee
+     * @param start                             start index
+     * @param limit                             limit
+     * @return uint256[]                        list of job ids
+     */
+    function teeJobIdsPaginated(
+        address teeAddress,
+        uint256 start,
+        uint256 limit
+    ) external view override returns (uint256[] memory) {
+        EnumerableSet.UintSet storage teeJobs = _tees[teeAddress].jobIdsList;
+
+        uint256 teeJobsCount = teeJobs.length();
+
+        if (start >= teeJobsCount) {
+            return new uint256[](0);
+        }
+
+        uint256 end = start + limit > teeJobsCount ? teeJobsCount : start + limit;
+
+        uint256[] memory jobList = new uint256[](end - start);
+        for (uint256 i = start; i < end; i++) {
+            jobList[i - start] = teeJobs.at(i);
+        }
+
+        return jobList;
     }
 
     /**
@@ -204,16 +241,10 @@ contract TeePoolImplementation is
     }
 
     /**
-     * @notice Returns details of the tee for the given job
-     *
-     * @param jobId                             id of the job
-     * @return TeeDetails                       details of the tee
+     * @notice Returns a list of job ids for the given file
      */
-    function jobTee(uint256 jobId) external view override returns (TeeInfo memory) {
-        if (_activeTeeList.length() == 0) {
-            revert NoActiveTee();
-        }
-        return tees(_activeTeeList.at(jobId % _activeTeeList.length()));
+    function fileJobIds(uint256 fileId) external view override returns (uint256[] memory) {
+        return _fileJobsIds[fileId].values();
     }
 
     /**
@@ -301,14 +332,26 @@ contract TeePoolImplementation is
             revert InsufficientFee();
         }
 
-        jobsCount++;
-        _jobs[jobsCount].fileId = fileId;
-        _jobs[jobsCount].bidAmount = msg.value;
-        _jobs[jobsCount].addedTimestamp = block.timestamp;
-        _jobs[jobsCount].ownerAddress = msg.sender;
-        _jobs[jobsCount].status = JobStatus.Submitted;
+        if (_activeTeeList.length() == 0) {
+            revert NoActiveTee();
+        }
 
-        emit JobSubmitted(jobsCount, fileId, msg.value);
+        uint256 jobsCountTemp = ++jobsCount;
+
+        address teeAddress = tees(_activeTeeList.at(jobsCountTemp % _activeTeeList.length())).teeAddress;
+
+        _jobs[jobsCountTemp].fileId = fileId;
+        _jobs[jobsCountTemp].bidAmount = msg.value;
+        _jobs[jobsCountTemp].addedTimestamp = block.timestamp;
+        _jobs[jobsCountTemp].ownerAddress = msg.sender;
+        _jobs[jobsCountTemp].status = JobStatus.Submitted;
+        _jobs[jobsCountTemp].teeAddress = teeAddress;
+
+        _fileJobsIds[fileId].add(jobsCountTemp);
+
+        _tees[teeAddress].jobIdsList.add(jobsCountTemp);
+
+        emit JobSubmitted(jobsCountTemp, fileId, teeAddress, msg.value);
     }
 
     /**
@@ -326,21 +369,23 @@ contract TeePoolImplementation is
      * @param jobId                            id of the job
      */
     function cancelJob(uint256 jobId) external override nonReentrant {
-        if (_jobs[jobId].ownerAddress != msg.sender) {
+        Job storage job = _jobs[jobId];
+        if (job.ownerAddress != msg.sender) {
             revert NotJobOwner();
         }
 
-        if (_jobs[jobId].status != JobStatus.Submitted) {
+        if (job.status != JobStatus.Submitted) {
             revert InvalidJobStatus();
         }
 
-        if (_jobs[jobId].addedTimestamp + cancelDelay > block.timestamp) {
+        if (job.addedTimestamp + cancelDelay > block.timestamp) {
             revert CancelDelayNotPassed();
         }
 
-        _jobs[jobId].status = JobStatus.Canceled;
+        job.status = JobStatus.Canceled;
+        _tees[job.teeAddress].jobIdsList.remove(jobId);
 
-        (bool success, ) = payable(msg.sender).call{value: _jobs[jobId].bidAmount}("");
+        (bool success, ) = payable(msg.sender).call{value: job.bidAmount}("");
         if (!success) {
             revert TransferFailed();
         }
@@ -358,12 +403,19 @@ contract TeePoolImplementation is
         Job storage job = _jobs[jobId];
 
         if (job.status != JobStatus.Submitted) {
-            revert JobCompleted();
+            revert InvalidJobStatus();
+        }
+
+        if (job.teeAddress != msg.sender) {
+            revert InvalidJobTee();
         }
 
         dataRegistry.addProof(job.fileId, proof);
 
         _tees[msg.sender].amount += job.bidAmount;
+
+        _tees[msg.sender].jobIdsList.remove(jobId);
+
         job.status = JobStatus.Completed;
 
         emit ProofAdded(msg.sender, jobId, job.fileId);

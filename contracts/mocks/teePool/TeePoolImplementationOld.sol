@@ -338,7 +338,7 @@ contract TeePoolImplementationOld is
             revert CancelDelayNotPassed();
         }
 
-        _jobs[jobsCount].status = JobStatus.Canceled;
+        _jobs[jobId].status = JobStatus.Canceled;
 
         (bool success, ) = payable(msg.sender).call{value: _jobs[jobId].bidAmount}("");
         if (!success) {

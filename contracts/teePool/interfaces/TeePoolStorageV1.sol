@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import "./ITeePool.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**`
  * @title Storage for TeePool
@@ -21,4 +20,6 @@ abstract contract TeePoolStorageV1 is ITeePool {
 
     uint256 public override teeFee;
     uint256 public override cancelDelay;
+
+    mapping(uint256 fileId => EnumerableSet.UintSet jobId) internal _fileJobsIds;
 }

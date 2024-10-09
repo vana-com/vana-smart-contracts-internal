@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IDataRegistry} from "../../dataRegistry/interfaces/IDataRegistry.sol";
 
 interface ITeePool {
@@ -23,6 +24,7 @@ interface ITeePool {
         JobStatus status;
         uint256 addedTimestamp;
         address ownerAddress;
+        address teeAddress;
     }
 
     struct Tee {
@@ -30,6 +32,7 @@ interface ITeePool {
         string url;
         uint256 amount;
         uint256 withdrawnAmount;
+        EnumerableSet.UintSet jobIdsList;
     }
 
     function version() external pure returns (uint256);
@@ -43,6 +46,7 @@ interface ITeePool {
         TeeStatus status;
         uint256 amount;
         uint256 withdrawnAmount;
+        uint256 jobsCount;
     }
     function tees(address teeAddress) external view returns (TeeInfo memory);
     function teesCount() external view returns (uint256);
@@ -53,7 +57,13 @@ interface ITeePool {
     function activeTeeListAt(uint256 index) external view returns (TeeInfo memory);
     function isTee(address teeAddress) external view returns (bool);
     function teeFee() external view returns (uint256);
-    function jobTee(uint256 jobId) external view returns (TeeInfo memory);
+    function teeJobIdsPaginated(
+        address teeAddress,
+        uint256 start,
+        uint256 limit
+    ) external view returns (uint256[] memory);
+    function fileJobIds(uint256 fileId) external view returns (uint256[] memory);
+
     function pause() external;
     function unpause() external;
     function updateDataRegistry(IDataRegistry dataRegistry) external;
