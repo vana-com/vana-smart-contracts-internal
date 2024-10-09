@@ -22,10 +22,8 @@ module.exports = {
   },
   networks: {
     hardhat: {},
-    satori: {
-      gasPrice: 1000000000, // Adjust the gas price (in wei)
-      gas: 5000000, // Optionally adjust the gas limit
-      url: process.env.SATORI_RPC_URL || "",
+    islander: {
+      url: process.env.ISLANDER_RPC_URL || "",
       accounts:
         process.env.DEPLOYER_PRIVATE_KEY !== undefined
           ? [process.env.DEPLOYER_PRIVATE_KEY]
@@ -34,6 +32,15 @@ module.exports = {
     moksha: {
       url: process.env.MOKSHA_RPC_URL || "",
       chainId: 14800,
+      accounts:
+        process.env.DEPLOYER_PRIVATE_KEY !== undefined
+          ? [process.env.DEPLOYER_PRIVATE_KEY]
+          : [],
+    },
+    satori: {
+      gasPrice: 1000000000, // Adjust the gas price (in wei)
+      gas: 5000000, // Optionally adjust the gas limit
+      url: process.env.SATORI_RPC_URL || "",
       accounts:
         process.env.DEPLOYER_PRIVATE_KEY !== undefined
           ? [process.env.DEPLOYER_PRIVATE_KEY]
@@ -50,16 +57,17 @@ module.exports = {
   etherscan: {
     apiKey: {
       // Is not required by blockscout. Can be any non-empty string
+      islander: "abc",
       satori: "abc",
       moksha: "abc",
     },
     customChains: [
       {
-        network: "satori",
-        chainId: 14801,
+        network: "islander",
+        chainId: 1480,
         urls: {
-          apiURL: process.env.SATORI_API_URL || "",
-          browserURL: process.env.SATORI_BROWSER_URL || "",
+          apiURL: process.env.ISLANDER_API_URL || "",
+          browserURL: process.env.ISLANDER_BROWSER_URL || "",
         },
       },
       {
@@ -68,6 +76,14 @@ module.exports = {
         urls: {
           apiURL: "https://api.moksha.vanascan.io/api/",
           browserURL: "https://moksha.vanascan.io",
+        },
+      },
+      {
+        network: "satori",
+        chainId: 14801,
+        urls: {
+          apiURL: process.env.SATORI_API_URL || "",
+          browserURL: process.env.SATORI_BROWSER_URL || "",
         },
       },
     ],
